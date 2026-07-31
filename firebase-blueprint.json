@@ -1,0 +1,98 @@
+{
+  "collections": {
+    "tasks": {
+      "fields": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "priority": { "type": "string" },
+        "status": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "checklist": { "type": "array" },
+        "attachments": { "type": "array" },
+        "comments": { "type": "array" },
+        "recurring": { "type": "string" },
+        "isPinned": { "type": "boolean" },
+        "completedAt": { "type": "string", "optional": true },
+        "assignedTo": { "type": "string", "optional": true }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "categories": {
+      "fields": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "color": { "type": "string" },
+        "type": { "type": "string" }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "habits": {
+      "fields": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "frequency": { "type": "string" },
+        "streak": { "type": "number" },
+        "completedDates": { "type": "array" },
+        "createdAt": { "type": "string" }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "team": {
+      "fields": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "avatar": { "type": "string" },
+        "rank": { "type": "string" },
+        "orgId": { "type": "string", "optional": true },
+        "email": { "type": "string", "optional": true },
+        "password": { "type": "string", "optional": true }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "organizations": {
+      "fields": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "messages": {
+      "fields": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderAvatar": { "type": "string" },
+        "senderEmail": { "type": "string" },
+        "orgId": { "type": "string", "optional": true },
+        "receiverId": { "type": "string", "optional": true },
+        "isSupport": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Tasky",
+  "description": "A modern productivity app designed to help students, professionals, and teams organize their tasks, assignments, projects, and deadlines in one place.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
