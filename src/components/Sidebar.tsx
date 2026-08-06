@@ -25,9 +25,11 @@ import {
   UserX,
   Mail,
   FolderKanban,
-  ChevronsUpDown
+  ChevronsUpDown,
+  Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { AndroidAppModal } from './AndroidAppModal';
 
 export const Sidebar: React.FC<{ onClose?: () => void; isMobile?: boolean }> = ({ onClose, isMobile }) => {
   const { 
@@ -51,6 +53,7 @@ export const Sidebar: React.FC<{ onClose?: () => void; isMobile?: boolean }> = (
   } = useTasky() as any;
 
   const { t } = useTranslation();
+  const [isAndroidModalOpen, setIsAndroidModalOpen] = useState(false);
 
   const isGuest = localStorage.getItem('tasky_guest_mode') === 'true';
   const myOrg = currentUserProfile?.orgId && organizations
@@ -245,6 +248,20 @@ export const Sidebar: React.FC<{ onClose?: () => void; isMobile?: boolean }> = (
           <span>v1.0.0</span>
         </div>
 
+        {/* Android & PWA App Button */}
+        <button
+          onClick={() => setIsAndroidModalOpen(true)}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-500/15 to-purple-500/15 border border-indigo-500/30 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:from-indigo-500/25 hover:to-purple-500/25 transition-all cursor-pointer shadow-sm"
+        >
+          <span className="flex items-center gap-2">
+            <Smartphone className="w-3.5 h-3.5 text-indigo-500" />
+            <span>Android & Mobile App</span>
+          </span>
+          <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-indigo-500 text-white font-extrabold">
+            APK / PWA
+          </span>
+        </button>
+
         {/* Toggle Theme */}
         <button
           onClick={() => setDarkMode(!darkMode)}
@@ -288,6 +305,10 @@ export const Sidebar: React.FC<{ onClose?: () => void; isMobile?: boolean }> = (
         </div>
       </div>
 
+      <AndroidAppModal
+        isOpen={isAndroidModalOpen}
+        onClose={() => setIsAndroidModalOpen(false)}
+      />
     </aside>
   );
 };
