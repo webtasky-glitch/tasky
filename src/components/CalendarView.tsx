@@ -233,68 +233,70 @@ export const CalendarView: React.FC = () => {
 
         {/* Calendar Body Rendering */}
         {viewMode === 'Month' && (
-          <div className="flex-1 flex flex-col min-h-[480px]">
-            {/* Weekday Names Header */}
-            <div className="grid grid-cols-7 gap-1 text-center font-semibold text-neutral-400 dark:text-neutral-500 text-xs py-2">
-              {dayNames.map(day => <div key={day}>{day}</div>)}
-            </div>
+          <div className="flex-1 flex flex-col min-h-[440px] overflow-x-auto">
+            <div className="min-w-[480px] sm:min-w-0 flex-1 flex flex-col">
+              {/* Weekday Names Header */}
+              <div className="grid grid-cols-7 gap-1 text-center font-semibold text-neutral-400 dark:text-neutral-500 text-xs py-2">
+                {dayNames.map(day => <div key={day}>{day}</div>)}
+              </div>
 
-            {/* Monthly Calendar Cells Grid */}
-            <div className="grid grid-cols-7 gap-1.5 flex-1 mt-1">
-              {calendarDays.map(({ date, isCurrentMonth }, idx) => {
-                const dayTasks = getTasksForDate(date);
-                const hasTasks = dayTasks.length > 0;
-                const isSelected = selectedDateStr && date && formatDateString(date) === selectedDateStr;
-                const isToday = date && formatDateString(date) === formatDateString(new Date());
+              {/* Monthly Calendar Cells Grid */}
+              <div className="grid grid-cols-7 gap-1.5 flex-1 mt-1">
+                {calendarDays.map(({ date, isCurrentMonth }, idx) => {
+                  const dayTasks = getTasksForDate(date);
+                  const hasTasks = dayTasks.length > 0;
+                  const isSelected = selectedDateStr && date && formatDateString(date) === selectedDateStr;
+                  const isToday = date && formatDateString(date) === formatDateString(new Date());
 
-                return (
-                  <div
-                    key={idx}
-                    onClick={() => date && handleDayClick(date)}
-                    className={`min-h-[75px] p-2 rounded-xl border flex flex-col justify-between transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-indigo-500 bg-white/40 dark:bg-white/15 shadow-sm ring-1 ring-indigo-500'
-                        : isToday
-                        ? 'border-indigo-500 bg-white/25 dark:bg-white/10 ring-1 ring-indigo-500'
-                        : isCurrentMonth 
-                        ? 'border-white/25 dark:border-white/5 bg-white/10 dark:bg-white/5 hover:bg-white/25 dark:hover:bg-white/10'
-                        : 'border-white/10 dark:border-white/5 bg-white/5 dark:bg-white/2 opacity-40 hover:opacity-70'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className={`text-xs font-semibold ${
-                        isToday 
-                          ? 'w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold' 
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => date && handleDayClick(date)}
+                      className={`min-h-[68px] sm:min-h-[75px] p-1.5 sm:p-2 rounded-xl border flex flex-col justify-between transition-all cursor-pointer ${
+                        isSelected
+                          ? 'border-indigo-500 bg-white/40 dark:bg-white/15 shadow-sm ring-1 ring-indigo-500'
+                          : isToday
+                          ? 'border-indigo-500 bg-white/25 dark:bg-white/10 ring-1 ring-indigo-500'
                           : isCurrentMonth 
-                          ? 'text-neutral-700 dark:text-neutral-300' 
-                          : 'text-neutral-400'
-                      }`}>
-                        {date ? date.getDate() : ''}
-                      </span>
-                      {hasTasks && (
-                        <span className="text-[9px] font-bold font-mono text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1 rounded-md">
-                          {dayTasks.length} {dayTasks.length === 1 ? 'task' : 'tasks'}
+                          ? 'border-white/25 dark:border-white/5 bg-white/10 dark:bg-white/5 hover:bg-white/25 dark:hover:bg-white/10'
+                          : 'border-white/10 dark:border-white/5 bg-white/5 dark:bg-white/2 opacity-40 hover:opacity-70'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[11px] sm:text-xs font-semibold ${
+                          isToday 
+                            ? 'w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold' 
+                            : isCurrentMonth 
+                            ? 'text-neutral-700 dark:text-neutral-300' 
+                            : 'text-neutral-400'
+                        }`}>
+                          {date ? date.getDate() : ''}
                         </span>
-                      )}
-                    </div>
-
-                    {/* Miniature horizontal list of tasks */}
-                    <div className="mt-2 space-y-1 overflow-hidden max-h-12">
-                      {dayTasks.slice(0, 2).map(t => (
-                        <div key={t.id} className="flex items-center gap-1 text-[9px] truncate text-neutral-600 dark:text-neutral-400 font-sans leading-tight">
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${getPriorityColor(t.priority)}`} />
-                          <span className={`truncate ${t.status === 'Completed' ? 'line-through text-neutral-400' : ''}`}>
-                            {t.title}
+                        {hasTasks && (
+                          <span className="text-[8px] sm:text-[9px] font-bold font-mono text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1 rounded-md">
+                            {dayTasks.length}
                           </span>
-                        </div>
-                      ))}
-                      {dayTasks.length > 2 && (
-                        <p className="text-[8px] font-bold text-indigo-500 font-mono">+{dayTasks.length - 2} more</p>
-                      )}
+                        )}
+                      </div>
+
+                      {/* Miniature horizontal list of tasks */}
+                      <div className="mt-1 sm:mt-2 space-y-0.5 sm:space-y-1 overflow-hidden max-h-10 sm:max-h-12">
+                        {dayTasks.slice(0, 2).map(t => (
+                          <div key={t.id} className="flex items-center gap-1 text-[8px] sm:text-[9px] truncate text-neutral-600 dark:text-neutral-400 font-sans leading-tight">
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${getPriorityColor(t.priority)}`} />
+                            <span className={`truncate ${t.status === 'Completed' ? 'line-through text-neutral-400' : ''}`}>
+                              {t.title}
+                            </span>
+                          </div>
+                        ))}
+                        {dayTasks.length > 2 && (
+                          <p className="text-[8px] font-bold text-indigo-500 font-mono">+{dayTasks.length - 2} more</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
