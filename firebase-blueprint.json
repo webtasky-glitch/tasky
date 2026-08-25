@@ -94,6 +94,23 @@
         "read": "true",
         "write": "true"
       }
+    },
+    "aiSupportQA": {
+      "fields": {
+        "id": { "type": "string" },
+        "question": { "type": "string" },
+        "answer": { "type": "string" },
+        "keywords": { "type": "array", "optional": true },
+        "category": { "type": "string", "optional": true },
+        "usageCount": { "type": "number", "optional": true },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string", "optional": true },
+        "createdBy": { "type": "string", "optional": true }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
     }
   }
 }
