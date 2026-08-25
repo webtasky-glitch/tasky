@@ -131,7 +131,12 @@ export interface AiSupportQA {
   id: string;
   question: string;
   answer: string;
+  keywords?: string[];
+  category?: string;
+  usageCount?: number;
+  createdBy?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface JoinRequest {
