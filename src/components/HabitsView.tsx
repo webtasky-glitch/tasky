@@ -228,8 +228,8 @@ export const HabitsView: React.FC = () => {
                 </div>
 
                 {/* Last 7 Days completion checkoff dots */}
-                <div className="flex items-center gap-3 self-center">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end overflow-x-auto pb-1 md:pb-0">
+                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                     {last7Days.map((day, dIdx) => {
                       const dateStr = formatDateString(day);
                       const isCompleted = habit.completedDates.includes(dateStr);
@@ -240,7 +240,7 @@ export const HabitsView: React.FC = () => {
                           key={dIdx}
                           onClick={() => toggleHabitDate(habit.id, dateStr)}
                           title={`${getDayFormatted(day)}: ${isCompleted ? 'Completed' : 'Pending'}`}
-                          className={`w-9 h-9 rounded-full border flex flex-col items-center justify-center transition-all cursor-pointer relative group ${
+                          className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full border flex flex-col items-center justify-center transition-all cursor-pointer relative group shrink-0 ${
                             isCompleted 
                               ? 'bg-emerald-500 border-emerald-500 text-white hover:bg-emerald-600 hover:border-emerald-600 shadow-sm shadow-emerald-500/10' 
                               : isToday
