@@ -166,28 +166,28 @@ export const SavedAnswersView: React.FC<SavedAnswersViewProps> = ({
     <div className="flex-1 flex flex-col h-full bg-white/40 dark:bg-black/20 overflow-hidden">
       
       {/* Header Banner */}
-      <div className="p-6 border-b border-neutral-200/20 dark:border-white/5 bg-white/40 dark:bg-black/30 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="p-4 sm:p-6 border-b border-neutral-200/20 dark:border-white/5 bg-white/40 dark:bg-black/30 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-indigo-500/10 dark:bg-indigo-400/10 border border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-              <Bot className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-indigo-500/10 dark:bg-indigo-400/10 border border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+              <Bot className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                Saved Answers & AI Auto-Replies
+              <h2 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white flex items-center gap-2 flex-wrap">
+                <span>Saved Answers & Auto-Replies</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-mono font-bold">
                   {aiSupportQA?.length || 0} active
                 </span>
               </h2>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                Automated knowledge base. The AI instant-replies to user support queries matching these triggers.
+              <p className="text-[11px] sm:text-xs text-neutral-500 dark:text-neutral-400">
+                Automated knowledge base for instant 24/7 AI answers.
               </p>
             </div>
           </div>
         </div>
 
         {/* Header Action Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           <button
             id="toggle-simulator-btn"
             onClick={() => setShowSimulator(!showSimulator)}
@@ -198,16 +198,16 @@ export const SavedAnswersView: React.FC<SavedAnswersViewProps> = ({
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>{showSimulator ? 'Close Simulator' : 'Test AI Simulator'}</span>
+            <span>{showSimulator ? 'Close Test' : 'Test AI'}</span>
           </button>
 
           <button
             id="add-saved-answer-btn"
             onClick={() => handleOpenCreateModal()}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-500/20 flex items-center gap-1.5 transition-all cursor-pointer"
+            className="px-3.5 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-500/20 flex items-center gap-1.5 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>New Auto-Reply</span>
+            <span>New Reply</span>
           </button>
 
           {onClose && (
