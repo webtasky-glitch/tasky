@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useTasky } from '../TaskyContext';
 import { TeamMember } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, Trash2, Search, Shield, Building2, UserX, AlertTriangle, CheckCircle2, UserPlus } from 'lucide-react';
+import { Users, Trash2, Search, Shield, Building2, UserX, AlertTriangle, CheckCircle2, UserPlus, Mail } from 'lucide-react';
+import { SendEmailModal } from './SendEmailModal';
 
 export const ManageUsersView: React.FC<{ onSwitchToAdd?: () => void }> = ({ onSwitchToAdd }) => {
   const { teamMembers, deleteTeamMember, organizations, userOrganizations, currentUserProfile, setTeamMembers } = useTasky() as any;
@@ -14,6 +15,7 @@ export const ManageUsersView: React.FC<{ onSwitchToAdd?: () => void }> = ({ onSw
   const [selectedOrgFilter, setSelectedOrgFilter] = useState('all');
   const [selectedRankFilter, setSelectedRankFilter] = useState('all');
   const [userToDelete, setUserToDelete] = useState<TeamMember | null>(null);
+  const [emailModalUser, setEmailModalUser] = useState<TeamMember | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -301,6 +303,18 @@ export const ManageUsersView: React.FC<{ onSwitchToAdd?: () => void }> = ({ onSw
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    {member.email && (
+                      <button
+                        type="button"
+                        onClick={() => setEmailModalUser(member)}
+                        className="px-3 py-2 bg-red-500/10 hover:bg-red-500 text-red-600 hover:text-white rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-1.5 border border-red-500/20"
+                        title="Send Welcome Email via Gmail"
+                      >
+                        <Mail className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Email Credentials</span>
+                      </button>
+                    )}
+
                     {isSuper ? (
                       <span className="text-xs text-neutral-400 font-medium italic px-3 py-1.5 bg-neutral-100 dark:bg-neutral-850 rounded-xl">
                         Protected Super Admin
@@ -394,6 +408,19 @@ export const ManageUsersView: React.FC<{ onSwitchToAdd?: () => void }> = ({ onSw
             </div>
           )}
         </AnimatePresence>
+
+        {emailModalUser && (
+          <SendEmailModal
+            isOpen={!!emailModalUser}
+            onClose={() => setEmailModalUser(null)}
+            recipientName={emailModalUser.name}
+            recipientEmail={emailModalUser.email || ''}
+            initialPassword={emailModalUser.password || '123456'}
+            role={emailModalUser.role}
+            rank={emailModalUser.rank}
+            orgName={organizations.find((o: any) => o.id === emailModalUser.orgId)?.name}
+          />
+        )}
 
       </div>
     </div>
