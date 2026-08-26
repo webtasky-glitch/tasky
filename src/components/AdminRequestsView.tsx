@@ -26,6 +26,7 @@ import {
   Shield
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { SendEmailModal } from './SendEmailModal';
 
 export const AdminRequestsView: React.FC = () => {
   const { 
@@ -50,6 +51,8 @@ export const AdminRequestsView: React.FC = () => {
   const [editMemberEmail, setEditMemberEmail] = useState('');
   const [editMemberPassword, setEditMemberPassword] = useState('');
   const [editMemberOrgId, setEditMemberOrgId] = useState('');
+
+  const [emailModalUser, setEmailModalUser] = useState<any | null>(null);
 
   const handleUpdateMemberSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -618,6 +621,18 @@ export const AdminRequestsView: React.FC = () => {
                               </button>
                             )}
 
+                            {/* Send Welcome Email / Gmail button */}
+                            {m.email && (
+                              <button
+                                type="button"
+                                onClick={() => setEmailModalUser(m)}
+                                className="p-1 rounded-lg bg-neutral-50 dark:bg-neutral-850 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-500 hover:text-red-600 transition-colors cursor-pointer flex items-center justify-center border border-red-500/20"
+                                title="Compose Welcome Email (Gmail)"
+                              >
+                                <Mail className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+
                             {/* Edit member button */}
                             <button
                               type="button"
@@ -802,6 +817,19 @@ export const AdminRequestsView: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {emailModalUser && (
+        <SendEmailModal
+          isOpen={!!emailModalUser}
+          onClose={() => setEmailModalUser(null)}
+          recipientName={emailModalUser.name}
+          recipientEmail={emailModalUser.email}
+          initialPassword={emailModalUser.password || '123456'}
+          role={emailModalUser.role}
+          rank={emailModalUser.rank}
+          orgName={organizations.find((o: any) => o.id === emailModalUser.orgId)?.name}
+        />
       )}
     </div>
   );
