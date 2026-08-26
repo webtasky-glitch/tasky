@@ -38,6 +38,7 @@ export const DashboardView: React.FC = () => {
     tasks, 
     categories, 
     teamMembers, 
+    projects,
     addTask, 
     toggleTaskComplete, 
     togglePinTask,
@@ -47,25 +48,50 @@ export const DashboardView: React.FC = () => {
     setActiveTab
   } = useTasky() as any;
 
-  // Filter assignees according to user role rules
-  const assignableMembers = teamMembers.filter((tm: any) => {
-    if (currentUserProfile?.rank === 'Admin') {
-      return true;
-    }
-    if (tm.rank === 'Admin') {
-      return false; // Admin is invisible to non-admins
-    }
-    if (currentUserProfile?.rank === 'Supervisor') {
-      return tm.orgId === currentUserProfile.orgId && tm.rank !== 'Manager';
-    }
-    if (currentUserProfile?.rank === 'User') {
-      return tm.id === currentUserProfile.id;
-    }
-    if (currentUserProfile?.rank === 'Manager') {
-      return tm.orgId === currentUserProfile.orgId;
-    }
-    return tm.id === currentUserProfile?.id;
-  });
+  // Filter assignees: Plan members based on rank hierarchy PLUS all members from projects the user is currently in (Cross-plan)!
+  const assignableMembers = React.useMemo(() => {
+    const currentUserId = currentUserProfile?.id || user?.uid || '';
+    const currentEmail = currentUserProfile?.email?.toLowerCase() || user?.email?.toLowerCase() || '';
+
+    // Find all projects the current user belongs to or owns
+    const userProjects = (projects || []).filter((p: any) => 
+      p.ownerId === currentUserId || 
+      (p.memberIds || []).includes(currentUserId) ||
+      (currentEmail && (p.memberIds || []).some((mId: string) => mId.toLowerCase() === currentEmail)) ||
+      (p.ownerEmail && currentEmail && p.ownerEmail.toLowerCase() === currentEmail)
+    );
+
+    // Collect all member IDs/emails across user's projects
+    const projectMemberIds = new Set<string>();
+    userProjects.forEach((p: any) => {
+      if (p.ownerId) projectMemberIds.add(p.ownerId.toLowerCase());
+      if (p.ownerEmail) projectMemberIds.add(p.ownerEmail.toLowerCase());
+      (p.memberIds || []).forEach((mId: string) => projectMemberIds.add(mId.toLowerCase()));
+    });
+
+    return (teamMembers || []).filter((tm: any) => {
+      // 1. Admin can assign to anyone
+      if (currentUserProfile?.rank === 'Admin') return true;
+      if (tm.rank === 'Admin') return false; // Admin is invisible to non-admins
+
+      // 2. Cross-Plan Project assignment: Anyone who shares a project with the current user!
+      const isProjectPeer = (tm.id && projectMemberIds.has(tm.id.toLowerCase())) ||
+                            (tm.email && projectMemberIds.has(tm.email.toLowerCase()));
+      if (isProjectPeer) return true;
+
+      // 3. Workspace plan hierarchy rules
+      if (currentUserProfile?.rank === 'Supervisor') {
+        return tm.orgId === currentUserProfile.orgId && tm.rank !== 'Manager';
+      }
+      if (currentUserProfile?.rank === 'User') {
+        return tm.id === currentUserProfile.id;
+      }
+      if (currentUserProfile?.rank === 'Manager') {
+        return tm.orgId === currentUserProfile.orgId;
+      }
+      return tm.id === currentUserProfile?.id;
+    });
+  }, [teamMembers, projects, currentUserProfile, user]);
 
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState('');
