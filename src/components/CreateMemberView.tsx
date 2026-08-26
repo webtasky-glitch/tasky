@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { useTasky } from '../TaskyContext';
 import { UserRank } from '../types';
 import { motion } from 'motion/react';
-import { UserPlus, UserX, Shield, Briefcase, Mail, Key, Building2, CheckCircle2 } from 'lucide-react';
+import { UserPlus, UserX, Shield, Briefcase, Mail, Key, Building2, CheckCircle2, ExternalLink, Sparkles } from 'lucide-react';
+import { SendEmailModal } from './SendEmailModal';
+import { DEFAULT_STANDARD_PASSWORD, openGmailCompose, getGmailComposeUrl, generateWelcomeEmailSubject, generateWelcomeEmailBody } from '../utils/emailUtils';
 
 export const CreateMemberView: React.FC<{ onSwitchToManage?: () => void }> = ({ onSwitchToManage }) => {
   const { addTeamMemberWithRank, organizations, userOrganizations, currentUserProfile } = useTasky() as any;
@@ -11,9 +13,19 @@ export const CreateMemberView: React.FC<{ onSwitchToManage?: () => void }> = ({ 
   const [role, setRole] = useState(''); // Manually added position/role
   const [rank, setRank] = useState<UserRank>('User');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState(DEFAULT_STANDARD_PASSWORD);
   const [orgId, setOrgId] = useState('');
+  const [openGmailAfterCreate, setOpenGmailAfterCreate] = useState(true);
   const [success, setSuccess] = useState(false);
+  const [createdUserData, setCreatedUserData] = useState<{
+    name: string;
+    email: string;
+    password: string;
+    role: string;
+    rank: string;
+    orgName?: string;
+  } | null>(null);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,30 +38,63 @@ export const CreateMemberView: React.FC<{ onSwitchToManage?: () => void }> = ({ 
       return;
     }
 
+    const effectivePassword = password.trim() || DEFAULT_STANDARD_PASSWORD;
+    const effectiveEmail = email.trim();
+
     try {
       // If the creator is a manager, automatically assign to their company
       const assignedOrgId = currentUserProfile?.rank === 'Manager' 
         ? currentUserProfile.orgId 
         : (orgId || undefined);
 
+      const targetOrg = organizations?.find((o: any) => o.id === assignedOrgId);
+
       await addTeamMemberWithRank(
         name.trim(),
         role.trim(),
         rank,
-        email.trim() || undefined,
-        password || undefined,
+        effectiveEmail || undefined,
+        effectivePassword,
         assignedOrgId
       );
 
-      // Reset
+      const created = {
+        name: name.trim(),
+        email: effectiveEmail,
+        password: effectivePassword,
+        role: role.trim(),
+        rank,
+        orgName: targetOrg?.name
+      };
+
+      setCreatedUserData(created);
+      setSuccess(true);
+
+      // If option to open Gmail is selected and email was provided
+      if (openGmailAfterCreate && effectiveEmail) {
+        const subject = generateWelcomeEmailSubject(created.name);
+        const body = generateWelcomeEmailBody({
+          name: created.name,
+          email: created.email,
+          password: created.password,
+          role: created.role,
+          rank: created.rank,
+          orgName: created.orgName
+        });
+        openGmailCompose({
+          to: created.email,
+          subject,
+          body
+        });
+      }
+
+      // Reset Form fields
       setName('');
       setRole('');
       setRank('User');
       setEmail('');
-      setPassword('');
+      setPassword(DEFAULT_STANDARD_PASSWORD);
       setOrgId('');
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 4000);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to add member.');
     }
@@ -107,14 +152,69 @@ export const CreateMemberView: React.FC<{ onSwitchToManage?: () => void }> = ({ 
           </p>
         </div>
 
-        {success && (
+        {success && createdUserData && (
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-2xl flex items-center gap-3 text-xs"
+            className="p-5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-200 rounded-3xl space-y-3 shadow-md"
           >
-            <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-            <span>Member was successfully enrolled! They can now log in with their email and password.</span>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-500/20 rounded-2xl text-emerald-600 dark:text-emerald-400 shrink-0">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Member Successfully Enrolled!
+                  </h4>
+                  <p className="text-xs text-neutral-600 dark:text-neutral-300 mt-0.5">
+                    <strong>{createdUserData.name}</strong> can now log in with email: <code className="bg-emerald-500/20 px-1.5 py-0.5 rounded text-[11px] font-mono">{createdUserData.email || 'No email'}</code> and password: <code className="bg-emerald-500/20 px-1.5 py-0.5 rounded text-[11px] font-mono">{createdUserData.password}</code>.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSuccess(false)}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-white p-1 rounded-lg transition-colors cursor-pointer text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            {createdUserData.email && (
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-emerald-500/20">
+                <a
+                  href={getGmailComposeUrl({
+                    to: createdUserData.email,
+                    subject: generateWelcomeEmailSubject(createdUserData.name),
+                    body: generateWelcomeEmailBody({
+                      name: createdUserData.name,
+                      email: createdUserData.email,
+                      password: createdUserData.password,
+                      role: createdUserData.role,
+                      rank: createdUserData.rank,
+                      orgName: createdUserData.orgName
+                    })
+                  })}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer no-underline"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Open Gmail with Welcome Email</span>
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => setIsEmailModalOpen(true)}
+                  className="px-3.5 py-2 bg-white/80 dark:bg-neutral-800/80 hover:bg-white dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Mail className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Customize & Preview Email</span>
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -207,7 +307,15 @@ export const CreateMemberView: React.FC<{ onSwitchToManage?: () => void }> = ({ 
           </div>
 
           <div className="border-t border-neutral-200/20 dark:border-white/5 pt-4">
-            <h3 className="text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-3">System Login Credentials</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                System Login Credentials
+              </h3>
+              <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-lg border border-indigo-200/60 dark:border-indigo-900/50">
+                Default First-Time Password: 123456
+              </span>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Email */}
               <div className="space-y-1">
@@ -226,22 +334,60 @@ export const CreateMemberView: React.FC<{ onSwitchToManage?: () => void }> = ({ 
 
               {/* Password */}
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 flex items-center gap-1.5">
-                  <Key className="w-3.5 h-3.5 text-neutral-400" />
-                  Password
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 flex items-center gap-1.5">
+                    <Key className="w-3.5 h-3.5 text-neutral-400" />
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setPassword(DEFAULT_STANDARD_PASSWORD)}
+                    className="text-[10px] text-indigo-500 hover:underline cursor-pointer"
+                  >
+                    Reset to 123456
+                  </button>
+                </div>
                 <input
-                  type="password"
+                  type="text"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Password (minimum 6 chars)"
-                  className="w-full text-xs glass-input rounded-xl px-4 py-3 focus:outline-none text-neutral-800 dark:text-white font-medium"
+                  placeholder="Standard password: 123456"
+                  className="w-full text-xs glass-input rounded-xl px-4 py-3 focus:outline-none text-neutral-800 dark:text-white font-medium font-mono"
                 />
               </div>
             </div>
+
+            {/* Auto Open Gmail Toggle */}
+            <div className="mt-4 p-3 bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-red-500/10 text-red-600 dark:text-red-400 rounded-xl">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div>
+                  <label htmlFor="openGmailToggle" className="text-xs font-bold text-neutral-800 dark:text-white cursor-pointer block">
+                    Auto-Open Gmail Site with Credentials
+                  </label>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                    Immediately prepares a welcome email in Gmail with email, standard password (123456), and login link.
+                  </p>
+                </div>
+              </div>
+
+              <input
+                id="openGmailToggle"
+                type="checkbox"
+                checked={openGmailAfterCreate}
+                onChange={(e) => setOpenGmailAfterCreate(e.target.checked)}
+                className="w-4 h-4 text-indigo-600 rounded cursor-pointer accent-indigo-600"
+              />
+            </div>
           </div>
 
-          <div className="border-t border-neutral-200/20 dark:border-white/5 pt-5 flex justify-end">
+          <div className="border-t border-neutral-200/20 dark:border-white/5 pt-5 flex items-center justify-between gap-3">
+            <p className="text-[11px] text-neutral-400">
+              Standard initial password for newly created accounts is <strong className="text-neutral-600 dark:text-neutral-300">123456</strong>.
+            </p>
+
             <button
               type="submit"
               className="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-xs rounded-xl shadow-md hover:shadow-indigo-500/20 transition-all duration-200 cursor-pointer flex items-center gap-2"
@@ -251,6 +397,20 @@ export const CreateMemberView: React.FC<{ onSwitchToManage?: () => void }> = ({ 
             </button>
           </div>
         </form>
+
+        {/* Email Modal */}
+        {createdUserData && (
+          <SendEmailModal
+            isOpen={isEmailModalOpen}
+            onClose={() => setIsEmailModalOpen(false)}
+            recipientName={createdUserData.name}
+            recipientEmail={createdUserData.email}
+            initialPassword={createdUserData.password}
+            role={createdUserData.role}
+            rank={createdUserData.rank}
+            orgName={createdUserData.orgName}
+          />
+        )}
       </div>
     </div>
   );
