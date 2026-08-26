@@ -42,6 +42,13 @@ export const isTaskForUser = (
                        currentUserProfile.rank === 'Admin' ||
                        currentUserProfile.email?.toLowerCase().trim() === 'webtasky@gmail.com';
 
+  // Cross-Plan Project Tasks: If task is associated with a shared project and assigned to/created by user, always visible
+  if (task.projectId) {
+    if (isTaskAssignedToUser(task, currentUserProfile?.id, user?.uid) || task.createdBy === currentUserProfile?.id || (user && task.createdBy === user.uid)) {
+      return true;
+    }
+  }
+
   // 1. Super Admin in default global view (no specific org selected and not impersonating)
   if (isSuperAdmin && !currentUserProfile.isImpersonated && !currentUserProfile.orgId) {
     return true;
