@@ -35,6 +35,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
   const { 
     categories, 
     teamMembers, 
+    projects,
     updateTask, 
     deleteTask, 
     togglePinTask,
@@ -47,25 +48,56 @@ export const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
     currentUserProfile
   } = useTasky() as any;
 
-  // Filter assignees according to user role rules
-  const assignableMembers = teamMembers.filter((tm: any) => {
-    if (currentUserProfile?.rank === 'Admin') {
-      return true;
+  // Filter assignees: When in a Project, anyone in the project can assign to anyone in the project independent of plan!
+  const assignableMembers = React.useMemo(() => {
+    // Check if task is associated with a project
+    if (task.projectId && projects && Array.isArray(projects)) {
+      const proj = projects.find((p: any) => p.id === task.projectId);
+      if (proj) {
+        const projectMemberIds = [proj.ownerId, ...(proj.memberIds || [])].filter(Boolean);
+        const projectMembers = (teamMembers || []).filter((tm: any) => {
+          const isIdMatch = tm.id && projectMemberIds.some((id: string) => id.toLowerCase() === tm.id.toLowerCase());
+          const isEmailMatch = tm.email && projectMemberIds.some((id: string) => id.toLowerCase() === tm.email.toLowerCase());
+          const isOwner = proj.ownerId && (
+            proj.ownerId.toLowerCase() === tm.id?.toLowerCase() ||
+            (tm.email && proj.ownerId.toLowerCase() === tm.email.toLowerCase())
+          );
+          return isIdMatch || isEmailMatch || isOwner;
+        });
+
+        const isCurrentUserInProject = currentUserProfile?.rank === 'Admin' ||
+          projectMemberIds.some((id: string) => 
+            id.toLowerCase() === currentUserProfile?.id?.toLowerCase() ||
+            (currentUserProfile?.email && id.toLowerCase() === currentUserProfile?.email.toLowerCase()) ||
+            (proj.ownerEmail && currentUserProfile?.email && proj.ownerEmail.toLowerCase() === currentUserProfile.email.toLowerCase())
+          );
+
+        if (isCurrentUserInProject && projectMembers.length > 0) {
+          return projectMembers;
+        }
+      }
     }
-    if (tm.rank === 'Admin') {
-      return false; // Admin is invisible to non-admins
-    }
-    if (currentUserProfile?.rank === 'Supervisor') {
-      return tm.orgId === currentUserProfile.orgId && tm.rank !== 'Manager';
-    }
-    if (currentUserProfile?.rank === 'User') {
-      return tm.id === currentUserProfile.id;
-    }
-    if (currentUserProfile?.rank === 'Manager') {
-      return tm.orgId === currentUserProfile.orgId;
-    }
-    return tm.id === currentUserProfile?.id;
-  });
+
+    // Standard workspace plan hierarchy filtering
+    return (teamMembers || []).filter((tm: any) => {
+      if (currentUserProfile?.rank === 'Admin') {
+        return true;
+      }
+      if (tm.rank === 'Admin') {
+        return false; // Admin is invisible to non-admins
+      }
+      if (currentUserProfile?.rank === 'Supervisor') {
+        return tm.orgId === currentUserProfile.orgId && tm.rank !== 'Manager';
+      }
+      if (currentUserProfile?.rank === 'User') {
+        return tm.id === currentUserProfile.id;
+      }
+      if (currentUserProfile?.rank === 'Manager') {
+        return tm.orgId === currentUserProfile.orgId;
+      }
+      return tm.id === currentUserProfile?.id;
+    });
+  }, [task.projectId, projects, teamMembers, currentUserProfile]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState(task.title);
