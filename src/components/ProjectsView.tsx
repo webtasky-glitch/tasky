@@ -18,9 +18,14 @@ import {
   ArrowRight,
   ShieldCheck,
   Search,
-  X
+  X,
+  UserCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { AssigneeMultiSelector } from './AssigneeMultiSelector';
+import { AssigneeAvatarStack } from './AssigneeAvatarStack';
+import { TaskModal } from './TaskModal';
+import { getTaskAssigneeIds } from '../utils/taskFilter';
 
 export const ProjectsView: React.FC = () => {
   const { 
@@ -71,9 +76,34 @@ export const ProjectsView: React.FC = () => {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDueDate, setNewTaskDueDate] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<'Low' | 'Medium' | 'High' | 'Urgent'>('Medium');
+  const [newTaskAssignees, setNewTaskAssignees] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTaskModal, setSelectedTaskModal] = useState<Task | null>(null);
 
   const activeProject = projects.find((p: Project) => p.id === selectedProjectId) || userProjects[0];
+
+  // Members belonging to this active project (Owner + all invited/joined members)
+  // Cross-plan: Anyone in this project can be assigned tasks by anyone in the project!
+  const activeProjectMembers = React.useMemo(() => {
+    if (!activeProject) return [];
+    const projectMemberIds = [activeProject.ownerId, ...(activeProject.memberIds || [])].filter(Boolean);
+    return (teamMembers || []).filter((tm: any) => {
+      const isIdMatch = tm.id && projectMemberIds.some((id: string) => id.toLowerCase() === tm.id.toLowerCase());
+      const isEmailMatch = tm.email && projectMemberIds.some((id: string) => id.toLowerCase() === tm.email.toLowerCase());
+      const isOwner = activeProject.ownerId && (
+        activeProject.ownerId.toLowerCase() === tm.id?.toLowerCase() ||
+        (tm.email && activeProject.ownerId.toLowerCase() === tm.email.toLowerCase())
+      );
+      return isIdMatch || isEmailMatch || isOwner;
+    });
+  }, [activeProject, teamMembers]);
+
+  // Set default assignee to current user when active project changes
+  React.useEffect(() => {
+    if (currentUserId && newTaskAssignees.length === 0) {
+      setNewTaskAssignees([currentUserId]);
+    }
+  }, [currentUserId, activeProject?.id]);
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -123,6 +153,8 @@ export const ProjectsView: React.FC = () => {
     e.preventDefault();
     if (!newTaskTitle.trim() || !activeProject) return;
 
+    const assigned = newTaskAssignees.length > 0 ? newTaskAssignees : [currentUserId];
+
     addTask({
       title: newTaskTitle.trim(),
       description: `Task for project ${activeProject.name}`,
@@ -131,7 +163,8 @@ export const ProjectsView: React.FC = () => {
       status: 'Todo',
       categoryId: 'cat-project',
       projectId: activeProject.id,
-      assignedTo: currentUserId,
+      assignedTo: assigned[0],
+      assignedToIds: assigned,
       createdBy: currentUserId,
       orgId: currentUserProfile?.orgId || undefined,
       isPinned: false,
@@ -143,6 +176,7 @@ export const ProjectsView: React.FC = () => {
 
     setNewTaskTitle('');
     setNewTaskDueDate('');
+    setNewTaskAssignees(currentUserId ? [currentUserId] : []);
   };
 
   // Filter tasks belonging to active project
@@ -401,40 +435,70 @@ export const ProjectsView: React.FC = () => {
               </div>
 
               {/* Add Project Task Bar */}
-              <div className="bg-white/40 dark:bg-neutral-800/40 rounded-2xl p-4 border border-neutral-200/40 dark:border-white/5">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-3 flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-indigo-500" />
-                  Add Task to {activeProject.name}
-                </h3>
+              <div className="bg-white/40 dark:bg-neutral-800/40 rounded-2xl p-4 border border-neutral-200/40 dark:border-white/5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-indigo-500" />
+                    Add Task to {activeProject.name}
+                  </h3>
+                  <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
+                    Assignable to any member in this project ({activeProjectMembers.length})
+                  </span>
+                </div>
 
-                <form onSubmit={handleAddProjectTask} className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                  <div className="sm:col-span-6">
-                    <input
-                      type="text"
-                      placeholder="Project task title..."
-                      value={newTaskTitle}
-                      onChange={(e) => setNewTaskTitle(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-white/60 dark:bg-neutral-900/60 border border-neutral-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:border-indigo-500"
-                      required
-                    />
+                <form onSubmit={handleAddProjectTask} className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                    <div className="sm:col-span-6">
+                      <input
+                        type="text"
+                        placeholder="Project task title..."
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        className="w-full px-3.5 py-2 bg-white/60 dark:bg-neutral-900/60 border border-neutral-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:border-indigo-500 text-neutral-800 dark:text-white"
+                        required
+                      />
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <input
+                        type="date"
+                        value={newTaskDueDate}
+                        onChange={(e) => setNewTaskDueDate(e.target.value)}
+                        className="w-full px-3.5 py-2 bg-white/60 dark:bg-neutral-900/60 border border-neutral-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:border-indigo-500 text-neutral-800 dark:text-white"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <select
+                        value={newTaskPriority}
+                        onChange={(e) => setNewTaskPriority(e.target.value as any)}
+                        className="w-full px-3 py-2 bg-white/60 dark:bg-neutral-900/60 border border-neutral-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:border-indigo-500 text-neutral-800 dark:text-white"
+                      >
+                        <option value="Low">Low Priority</option>
+                        <option value="Medium">Medium Priority</option>
+                        <option value="High">High Priority</option>
+                        <option value="Urgent">Urgent</option>
+                      </select>
+                    </div>
                   </div>
 
-                  <div className="sm:col-span-3">
-                    <input
-                      type="date"
-                      value={newTaskDueDate}
-                      onChange={(e) => setNewTaskDueDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-white/60 dark:bg-neutral-900/60 border border-neutral-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-3">
+                  {/* Assignee selection row: Anyone in the project can assign to ANYONE in the project independent of plan! */}
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <div className="flex-1 w-full">
+                      <AssigneeMultiSelector
+                        selectedIds={newTaskAssignees}
+                        onChange={setNewTaskAssignees}
+                        assignableMembers={activeProjectMembers}
+                        currentUserId={currentUserId}
+                        placeholder="Assign any project member (cross-plan)..."
+                      />
+                    </div>
                     <button
                       type="submit"
-                      className="w-full py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+                      className="w-full sm:w-auto px-6 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
                     >
                       <Plus className="w-4 h-4" />
-                      Add Task
+                      Add Project Task
                     </button>
                   </div>
                 </form>
@@ -457,60 +521,74 @@ export const ProjectsView: React.FC = () => {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {projectTasks.map((t: Task) => (
-                      <div 
-                        key={t.id}
-                        className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
-                          t.status === 'Completed'
-                            ? 'bg-neutral-100/40 dark:bg-neutral-900/20 border-neutral-200/30 dark:border-white/5 opacity-70'
-                            : 'bg-white/60 dark:bg-neutral-800/60 border-neutral-200/50 dark:border-white/5 hover:border-indigo-500/30'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => toggleTaskComplete(t.id)}
-                            className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all cursor-pointer ${
-                              t.status === 'Completed'
-                                ? 'bg-emerald-500 border-emerald-500 text-white'
-                                : 'border-neutral-300 dark:border-neutral-600 hover:border-indigo-500'
-                            }`}
-                          >
-                            {t.status === 'Completed' && <Check className="w-3.5 h-3.5" />}
-                          </button>
+                    {projectTasks.map((t: Task) => {
+                      const taskAssignees = getTaskAssigneeIds(t);
+                      return (
+                        <div 
+                          key={t.id}
+                          className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                            t.status === 'Completed'
+                              ? 'bg-neutral-100/40 dark:bg-neutral-900/20 border-neutral-200/30 dark:border-white/5 opacity-70'
+                              : 'bg-white/60 dark:bg-neutral-800/60 border-neutral-200/50 dark:border-white/5 hover:border-indigo-500/30'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <button
+                              onClick={() => toggleTaskComplete(t.id)}
+                              className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                                t.status === 'Completed'
+                                  ? 'bg-emerald-500 border-emerald-500 text-white'
+                                  : 'border-neutral-300 dark:border-neutral-600 hover:border-indigo-500'
+                              }`}
+                            >
+                              {t.status === 'Completed' && <Check className="w-3.5 h-3.5" />}
+                            </button>
 
-                          <div>
-                            <span className={`text-xs font-semibold block ${
-                              t.status === 'Completed' ? 'line-through text-neutral-400' : 'text-neutral-900 dark:text-white'
-                            }`}>
-                              {t.title}
-                            </span>
-                            {t.dueDate && (
-                              <span className="text-[10px] text-neutral-400 flex items-center gap-1 mt-0.5">
-                                <Clock className="w-3 h-3" />
-                                {t.dueDate}
+                            <div 
+                              onClick={() => setSelectedTaskModal(t)}
+                              className="cursor-pointer min-w-0 group"
+                            >
+                              <span className={`text-xs font-semibold block group-hover:text-indigo-500 transition-colors ${
+                                t.status === 'Completed' ? 'line-through text-neutral-400' : 'text-neutral-900 dark:text-white'
+                              }`}>
+                                {t.title}
                               </span>
-                            )}
+                              {t.dueDate && (
+                                <span className="text-[10px] text-neutral-400 flex items-center gap-1 mt-0.5">
+                                  <Clock className="w-3 h-3" />
+                                  {t.dueDate}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0">
+                            {/* Assignee Avatar Stack */}
+                            <AssigneeAvatarStack
+                              assigneeIds={taskAssignees}
+                              members={teamMembers}
+                              maxAvatars={3}
+                              size="sm"
+                            />
+
+                            <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase ${
+                              t.priority === 'Urgent' ? 'bg-rose-500/10 text-rose-500' :
+                              t.priority === 'High' ? 'bg-amber-500/10 text-amber-500' :
+                              'bg-neutral-500/10 text-neutral-500'
+                            }`}>
+                              {t.priority}
+                            </span>
+
+                            <button
+                              onClick={() => deleteTask(t.id)}
+                              className="p-1 text-neutral-400 hover:text-rose-500 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase ${
-                            t.priority === 'Urgent' ? 'bg-rose-500/10 text-rose-500' :
-                            t.priority === 'High' ? 'bg-amber-500/10 text-amber-500' :
-                            'bg-neutral-500/10 text-neutral-500'
-                          }`}>
-                            {t.priority}
-                          </span>
-
-                          <button
-                            onClick={() => deleteTask(t.id)}
-                            className="p-1 text-neutral-400 hover:text-rose-500 transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -711,6 +789,14 @@ export const ProjectsView: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Task Modal for detailed project task view & editing */}
+      {selectedTaskModal && (
+        <TaskModal
+          task={tasks.find((t: Task) => t.id === selectedTaskModal.id) || selectedTaskModal}
+          onClose={() => setSelectedTaskModal(null)}
+        />
+      )}
     </div>
   );
 };
