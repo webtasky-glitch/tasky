@@ -1410,15 +1410,26 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (memberToUpdate) {
         const existingOrgIds = memberToUpdate.orgIds || (memberToUpdate.orgId ? [memberToUpdate.orgId] : []);
         const updatedOrgIds = Array.from(new Set([...existingOrgIds, targetOrg.id]));
+        const currentOrgRanks = memberToUpdate.orgRanks || {};
+        
+        // Joining with a code ALWAYS gives rank 'User' in THIS specific plan,
+        // without altering or overwriting their roles/ranks in any other plans!
+        const existingRankInThisOrg = currentOrgRanks[targetOrg.id];
+        const updatedOrgRanks = {
+          ...currentOrgRanks,
+          [targetOrg.id]: existingRankInThisOrg || 'User'
+        };
 
         const updatedMember: TeamMember = {
           ...memberToUpdate,
           orgId: targetOrg.id,
-          orgIds: updatedOrgIds
+          orgIds: updatedOrgIds,
+          orgRanks: updatedOrgRanks
         };
 
         await setDoc(doc(db, 'team', updatedMember.id), updatedMember);
         setTeamMembers(prev => prev.map(m => m.id === updatedMember.id ? updatedMember : m));
+        safeSaveLocalStorage('tasky_team_members', teamMembers.map(m => m.id === updatedMember.id ? updatedMember : m));
       } else {
         const newMemberId = activeMemberId || `tm-${Date.now()}`;
         const newMember: TeamMember = {
@@ -1427,18 +1438,22 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           email: userEmail || '',
           role: 'Team Member',
           rank: 'User',
+          orgRanks: { [targetOrg.id]: 'User' },
           avatar: (currentUserProfile?.name || 'M').slice(0, 2).toUpperCase(),
           orgId: targetOrg.id,
           orgIds: [targetOrg.id]
         };
         await setDoc(doc(db, 'team', newMemberId), newMember);
         setTeamMembers(prev => [...prev, newMember]);
+        safeSaveLocalStorage('tasky_team_members', [...teamMembers, newMember]);
       }
 
       setCurrentUserProfile(prev => prev ? {
         ...prev,
+        rank: (prev.orgRanks && prev.orgRanks[targetOrg.id]) || 'User',
         orgId: targetOrg.id,
-        orgIds: Array.from(new Set([...(prev.orgIds || (prev.orgId ? [prev.orgId] : [])), targetOrg.id]))
+        orgIds: Array.from(new Set([...(prev.orgIds || (prev.orgId ? [prev.orgId] : [])), targetOrg.id])),
+        orgRanks: { ...(prev.orgRanks || {}), [targetOrg.id]: (prev.orgRanks && prev.orgRanks[targetOrg.id]) || 'User' }
       } : null);
 
       setSelectedOrgId(targetOrg.id);
@@ -1446,12 +1461,96 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       return {
         success: true,
-        message: `Successfully joined plan "${targetOrg.name}"! Workspace switched.`,
+        message: `Successfully joined plan "${targetOrg.name}"! Starting as Member (User) in this plan.`,
         org: targetOrg
       };
     } catch (err: any) {
       console.error("Error joining organization by code:", err);
       return { success: false, message: err.message || 'Failed to join plan. Please try again.' };
+    }
+  };
+
+  // Admin assigns/selects the Manager of a Plan
+  const setOrganizationManager = async (orgId: string, managerMemberId: string) => {
+    const targetOrg = organizations.find(o => o.id === orgId);
+    if (!targetOrg) throw new Error('Organization plan not found');
+    const targetMember = teamMembers.find(tm => tm.id === managerMemberId);
+    if (!targetMember) throw new Error('Selected member not found');
+
+    const updatedOrg: Organization = {
+      ...targetOrg,
+      managerId: targetMember.id,
+      managerName: targetMember.name,
+      managerEmail: targetMember.email
+    };
+
+    // Update target member's orgRanks to 'Manager' for this specific plan
+    const updatedMember: TeamMember = {
+      ...targetMember,
+      orgRanks: {
+        ...(targetMember.orgRanks || {}),
+        [orgId]: 'Manager'
+      },
+      orgIds: Array.from(new Set([...(targetMember.orgIds || (targetMember.orgId ? [targetMember.orgId] : [])), orgId]))
+    };
+
+    setOrganizations(prev => {
+      const updated = prev.map(o => o.id === orgId ? updatedOrg : o);
+      safeSaveLocalStorage('tasky_organizations', updated);
+      return updated;
+    });
+
+    setTeamMembers(prev => {
+      const updated = prev.map(m => m.id === targetMember.id ? updatedMember : m);
+      safeSaveLocalStorage('tasky_team_members', updated);
+      return updated;
+    });
+
+    setSyncStatus('syncing');
+    try {
+      await setDoc(doc(db, 'organizations', orgId), updatedOrg);
+      await setDoc(doc(db, 'team', targetMember.id), updatedMember);
+      setSyncStatus('synced');
+    } catch (err: any) {
+      console.error("Error setting organization manager:", err);
+      setSyncStatus('error');
+      throw err;
+    }
+  };
+
+  // Plan Manager or Admin updates a user's role and rank inside a specific plan
+  const updateMemberRankInOrg = async (memberId: string, orgId: string, newRank: UserRank, newRole?: string) => {
+    const targetMember = teamMembers.find(tm => tm.id === memberId);
+    if (!targetMember) throw new Error('Member not found');
+
+    const currentOrgRanks = targetMember.orgRanks || {};
+    const updatedOrgRanks = {
+      ...currentOrgRanks,
+      [orgId]: newRank
+    };
+
+    const updatedMember: TeamMember = {
+      ...targetMember,
+      orgRanks: updatedOrgRanks,
+      ...(newRole ? { role: newRole } : {}),
+      // If this plan is currently their active orgId, keep rank property in sync
+      ...(targetMember.orgId === orgId ? { rank: newRank } : {})
+    };
+
+    setTeamMembers(prev => {
+      const updated = prev.map(m => m.id === targetMember.id ? updatedMember : m);
+      safeSaveLocalStorage('tasky_team_members', updated);
+      return updated;
+    });
+
+    setSyncStatus('syncing');
+    try {
+      await setDoc(doc(db, 'team', targetMember.id), updatedMember);
+      setSyncStatus('synced');
+    } catch (err: any) {
+      console.error("Error updating member rank in plan:", err);
+      setSyncStatus('error');
+      throw err;
     }
   };
 
@@ -1912,6 +2011,8 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     updateOrganization,
     deleteOrganization,
     joinOrganizationByCode,
+    setOrganizationManager,
+    updateMemberRankInOrg,
     sendMessage,
     addOrUpdateAiSupportQA,
     deleteAiSupportQA,
