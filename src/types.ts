@@ -89,6 +89,9 @@ export interface Organization {
   logo?: string;
   themeColor?: string;
   code?: string; // Join code for inviting users to this plan (e.g. PLAN-9X2K4M)
+  managerId?: string; // Plan Manager assigned by Admin
+  managerName?: string;
+  managerEmail?: string;
 }
 
 export interface Message {
