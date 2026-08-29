@@ -94,6 +94,8 @@ export const OrganizationsView: React.FC = () => {
     updateOrganization, 
     deleteOrganization, 
     joinOrganizationByCode,
+    setOrganizationManager,
+    updateMemberRankInOrg,
     currentUserProfile,
     teamMembers,
     tasks,
@@ -261,6 +263,12 @@ export const OrganizationsView: React.FC = () => {
 
     try {
       const targetOrgId = editMemberOrgId || selectedOrgIdForDetail || editingMember.orgId;
+      
+      if (targetOrgId) {
+        // Plan-specific update: updates user's role and rank inside this specific plan
+        await updateMemberRankInOrg(editingMember.id, targetOrgId, editMemberRank as any, editMemberRole.trim());
+      }
+
       const currentOrgRanks = editingMember.orgRanks || {};
       const updatedOrgRanks = targetOrgId ? { ...currentOrgRanks, [targetOrgId]: editMemberRank } : currentOrgRanks;
 
@@ -689,6 +697,17 @@ export const OrganizationsView: React.FC = () => {
               : (currentUserProfile?.rank || 'User');
             const currentUserRankVal = getRankValue(isAdmin ? 'Admin' : currentMemberRankInOrg);
 
+            // Is the current user the designated Manager of this plan or Admin?
+            const isPlanManager = 
+              (selectedOrg.managerId && selectedOrg.managerId === currentUserProfile?.id) || 
+              (currentUserProfile?.email && selectedOrg.managerEmail && selectedOrg.managerEmail.toLowerCase().trim() === currentUserProfile?.email.toLowerCase().trim()) || 
+              currentMemberRankInOrg === 'Manager';
+
+            const assignedManagerMember = teamMembers.find((tm: TeamMember) => 
+              tm.id === selectedOrg.managerId || 
+              (selectedOrg.managerEmail && tm.email && tm.email.toLowerCase().trim() === selectedOrg.managerEmail.toLowerCase().trim())
+            );
+
             return (
               <div className="border border-white/30 dark:border-white/10 rounded-3xl p-6 sm:p-8 bg-white/10 dark:bg-white/5 shadow-md space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200/20 dark:border-white/5 pb-4">
@@ -743,6 +762,62 @@ export const OrganizationsView: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Plan Manager Assignment & Status Banner */}
+                <div className="p-4 bg-white/40 dark:bg-neutral-900/50 border border-neutral-200/40 dark:border-white/10 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold shrink-0">
+                      <Shield className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-neutral-800 dark:text-white">
+                          Designated Plan Manager:
+                        </span>
+                        <span className="px-2 py-0.5 bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[10px] font-bold rounded-lg">
+                          {assignedManagerMember?.name || selectedOrg.managerName || 'No Manager Selected'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                        {assignedManagerMember ? (
+                          <>Manager has authority to edit roles and ranks of all members within <strong>{selectedOrg.name}</strong>.</>
+                        ) : (
+                          <>Admin can select a manager to lead this plan.</>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Admin Manager Assignment Dropdown */}
+                  {isAdmin && (
+                    <div className="flex items-center gap-2 self-end sm:self-auto">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 whitespace-nowrap">
+                        Assign Manager:
+                      </label>
+                      <select
+                        value={assignedManagerMember?.id || selectedOrg.managerId || ''}
+                        onChange={async (e) => {
+                          const targetMemberId = e.target.value;
+                          if (targetMemberId) {
+                            try {
+                              await setOrganizationManager(selectedOrg.id, targetMemberId);
+                            } catch (err: any) {
+                              setErrorMsg(err.message || 'Failed to assign manager');
+                            }
+                          }
+                        }}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer shadow-sm [&>option]:bg-white dark:[&>option]:bg-neutral-900"
+                      >
+                        <option value="">-- Choose Plan Manager --</option>
+                        {teamMembers.map((tm: TeamMember) => (
+                          <option key={tm.id} value={tm.id}>
+                            {tm.name} ({tm.email || tm.role})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
                 {/* Plan Invite Code Banner */}
                 <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                   <div className="space-y-1">
@@ -756,7 +831,7 @@ export const OrganizationsView: React.FC = () => {
                       </code>
                     </div>
                     <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                      Share this code with team members or managers to invite them directly to this plan.
+                      New members joining with this code start as <strong>User</strong> in this plan without changing their roles in any other plans.
                     </p>
                   </div>
 
@@ -795,7 +870,7 @@ export const OrganizationsView: React.FC = () => {
                 {/* Sub-tab Content: Members */}
                 {detailActiveTab === 'members' && (
                   <div className="space-y-4">
-                    {(isAdmin || currentMemberRankInOrg === 'Admin' || currentMemberRankInOrg === 'Manager') && (
+                    {(isAdmin || isPlanManager || currentMemberRankInOrg === 'Admin' || currentMemberRankInOrg === 'Manager') && (
                       <div className="flex justify-end pb-1">
                         <button
                           type="button"
@@ -815,6 +890,10 @@ export const OrganizationsView: React.FC = () => {
                             : (member.rank || 'User');
                           const memberRankVal = getRankValue(memberRankInOrg);
                           const doesOutrank = currentUserRankVal > memberRankVal;
+                          const isMemberSuperAdmin = member.email?.toLowerCase().trim() === 'webtasky@gmail.com' || member.role === 'Super Admin';
+                          
+                          // Plan Manager can edit EVERY user in this plan (except Global Super Admin)
+                          const canEditMemberRoleAndRank = (isAdmin || isPlanManager || doesOutrank) && !isMemberSuperAdmin;
 
                           return (
                             <React.Fragment key={member.id}>
@@ -839,8 +918,8 @@ export const OrganizationsView: React.FC = () => {
                                 </div>
                                 
                                 <div className="flex items-center gap-2 shrink-0">
-                                  {/* View Tasks only if outranked or self */}
-                                  {(doesOutrank || member.id === currentUserProfile?.id) ? (
+                                  {/* View Tasks if outranked, manager, admin, or self */}
+                                  {(doesOutrank || isPlanManager || isAdmin || member.id === currentUserProfile?.id) ? (
                                     <button
                                       type="button"
                                       onClick={() => setExpandedMemberId(expandedMemberId === member.id ? null : member.id)}
@@ -850,7 +929,7 @@ export const OrganizationsView: React.FC = () => {
                                     </button>
                                   ) : (
                                     <span className="text-[9px] text-neutral-400 italic font-medium px-2 py-1 bg-neutral-100/40 dark:bg-white/5 rounded-lg border border-neutral-200/20 dark:border-white/5">
-                                      Same or higher rank
+                                      Member
                                     </span>
                                   )}
 
@@ -866,8 +945,8 @@ export const OrganizationsView: React.FC = () => {
                                     </button>
                                   )}
 
-                                  {/* Edit member button if user outranks member or is system admin */}
-                                  {(isAdmin || doesOutrank) && (
+                                  {/* Edit member button: Plan Manager and Admin can change the role/rank of every user in the plan */}
+                                  {canEditMemberRoleAndRank && (
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -880,14 +959,14 @@ export const OrganizationsView: React.FC = () => {
                                         setEditMemberOrgId(selectedOrg.id);
                                       }}
                                       className="p-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950/30 text-amber-500 hover:text-amber-600 transition-colors cursor-pointer flex items-center justify-center border border-amber-500/20"
-                                      title={`Edit ${member.name}'s Rank & Details in this Plan`}
+                                      title={`Change ${member.name}'s Role & Rank in ${selectedOrg.name}`}
                                     >
                                       <Edit2 className="w-3.5 h-3.5" />
                                     </button>
                                   )}
 
-                                  {/* Delete / Kick member button if user outranks member or is system admin, and member is not themselves */}
-                                  {(isAdmin || doesOutrank) && member.id !== currentUserProfile?.id && (
+                                  {/* Delete / Kick member button */}
+                                  {(isAdmin || isPlanManager || doesOutrank) && member.id !== currentUserProfile?.id && !isMemberSuperAdmin && (
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -909,7 +988,7 @@ export const OrganizationsView: React.FC = () => {
                               </div>
 
                               {/* Expanded member tasks list */}
-                              {expandedMemberId === member.id && doesOutrank && (
+                              {expandedMemberId === member.id && (doesOutrank || isPlanManager || isAdmin) && (
                                 (() => {
                                   const memberTasks = tasks.filter((t: any) => isTaskAssignedToUser(t, member.id, member.email));
                                   return (
@@ -1325,6 +1404,10 @@ export const OrganizationsView: React.FC = () => {
                     </select>
                   </div>
                 )}
+              </div>
+
+              <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-xs text-neutral-600 dark:text-neutral-300">
+                <span className="font-semibold text-indigo-600 dark:text-indigo-400">Plan Role Control:</span> Changing this member's rank and role updates their access for this plan workspace without altering their permissions in other plans.
               </div>
 
               <div className="pt-4 border-t border-neutral-100 dark:border-white/5 flex gap-3 justify-end">
