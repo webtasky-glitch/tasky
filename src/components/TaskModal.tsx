@@ -33,6 +33,7 @@ interface TaskModalProps {
 
 export const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
   const { 
+    tasks,
     categories, 
     teamMembers, 
     projects,
@@ -108,6 +109,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
   const [editedStatus, setEditedStatus] = useState<TaskStatus>(task.status);
   const [editedAssignees, setEditedAssignees] = useState<string[]>(getTaskAssigneeIds(task));
   const [editedRecurring, setEditedRecurring] = useState<RecurringType>(task.recurring);
+  const [editedFocusBlock, setEditedFocusBlock] = useState<'MorningFocus' | 'AfternoonDeep' | 'QuickAdmin' | 'EveningReview'>(task.focusBlock || 'MorningFocus');
+  const [editedEstimatedHours, setEditedEstimatedHours] = useState<number>(task.estimatedHours || 1.5);
+  const [editedDependsOn, setEditedDependsOn] = useState<string>(task.dependsOnTaskId || '');
 
   // Subtask local states
   const [newSubtaskText, setNewSubtaskText] = useState('');
@@ -131,6 +135,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
       assignedTo: editedAssignees[0] || undefined,
       assignedToIds: editedAssignees,
       recurring: editedRecurring,
+      focusBlock: editedFocusBlock,
+      estimatedHours: Number(editedEstimatedHours) || 1.5,
+      dependsOnTaskId: editedDependsOn || undefined,
     });
     setIsEditing(false);
   };
@@ -839,6 +846,89 @@ startxref
                   <span className="text-neutral-700 dark:text-neutral-300">
                     {task.recurring !== 'None' ? task.recurring : 'Does not repeat'}
                   </span>
+                )}
+              </div>
+
+              {/* Energy & Focus Block Scheduling */}
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-neutral-500 font-sans flex items-center gap-1.5">
+                  Focus Slot
+                </span>
+                {isEditing ? (
+                  <select 
+                    value={editedFocusBlock} 
+                    onChange={(e) => setEditedFocusBlock(e.target.value as any)}
+                    className="glass-input rounded-xl px-2 py-1 text-xs focus:outline-none"
+                  >
+                    <option value="MorningFocus">🌅 Morning Focus</option>
+                    <option value="AfternoonDeep">⚡ Afternoon Deep</option>
+                    <option value="QuickAdmin">☕ Quick Admin</option>
+                    <option value="EveningReview">🌙 Evening Review</option>
+                  </select>
+                ) : (
+                  <span className="text-neutral-700 dark:text-neutral-300 font-medium">
+                    {task.focusBlock === 'MorningFocus' ? '🌅 Morning Focus' : task.focusBlock === 'AfternoonDeep' ? '⚡ Afternoon Deep' : task.focusBlock === 'QuickAdmin' ? '☕ Quick Admin' : task.focusBlock === 'EveningReview' ? '🌙 Evening Review' : '🌅 Morning Focus'}
+                  </span>
+                )}
+              </div>
+
+              {/* Estimated Workload Effort (Hours) */}
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-neutral-500 font-sans flex items-center gap-1.5">
+                  Effort (Hours)
+                </span>
+                {isEditing ? (
+                  <input 
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    max="12"
+                    value={editedEstimatedHours}
+                    onChange={(e) => setEditedEstimatedHours(parseFloat(e.target.value) || 1)}
+                    className="glass-input rounded-xl px-2 py-1 text-xs focus:outline-none w-20 text-right"
+                  />
+                ) : (
+                  <span className="text-neutral-700 dark:text-neutral-300 font-mono font-medium">
+                    {task.estimatedHours || 1.5} hrs
+                  </span>
+                )}
+              </div>
+
+              {/* Task Dependency (Blocked By) */}
+              <div className="space-y-1 text-xs">
+                <span className="text-neutral-500 font-sans flex items-center gap-1.5">
+                  Depends On (Blocked By)
+                </span>
+                {isEditing ? (
+                  <select
+                    value={editedDependsOn}
+                    onChange={(e) => setEditedDependsOn(e.target.value)}
+                    className="glass-input rounded-xl px-2 py-1.5 text-xs focus:outline-none w-full"
+                  >
+                    <option value="">No dependency (Independent)</option>
+                    {(tasks || []).filter((t: any) => t.id !== task.id).map((t: any) => (
+                      <option key={t.id} value={t.id}>
+                        {t.title} ({t.dueDate})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div>
+                    {task.dependsOnTaskId ? (
+                      (() => {
+                        const dep = (tasks || []).find((t: any) => t.id === task.dependsOnTaskId);
+                        return dep ? (
+                          <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-[11px] font-semibold">
+                            ↳ Waiting for: {dep.title} ({dep.status})
+                          </div>
+                        ) : (
+                          <span className="text-neutral-400">None</span>
+                        );
+                      })()
+                    ) : (
+                      <span className="text-neutral-400 italic">No dependency</span>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
