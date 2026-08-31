@@ -2,11 +2,18 @@ import React, { useState } from 'react';
 import { useTasky } from '../TaskyContext';
 import { TeamMember } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, Trash2, Search, Shield, Building2, UserX, AlertTriangle, CheckCircle2, UserPlus, Mail } from 'lucide-react';
+import { Users, Trash2, Search, Shield, Building2, UserX, AlertTriangle, CheckCircle2, UserPlus, Mail, Key, Copy, Check, RefreshCw, Sparkles } from 'lucide-react';
 import { SendEmailModal } from './SendEmailModal';
 
 export const ManageUsersView: React.FC<{ onSwitchToAdd?: () => void }> = ({ onSwitchToAdd }) => {
-  const { teamMembers, deleteTeamMember, organizations, userOrganizations, currentUserProfile, setTeamMembers } = useTasky() as any;
+  const { 
+    teamMembers, 
+    deleteTeamMember, 
+    organizations, 
+    userOrganizations, 
+    currentUserProfile, 
+    generateOrUpdateMemberApiKey 
+  } = useTasky() as any;
 
   const isSuperAdmin = currentUserProfile?.email?.toLowerCase().trim() === 'webtasky@gmail.com';
   const visibleOrgs = isSuperAdmin ? (organizations || []) : (userOrganizations || []);
@@ -18,8 +25,48 @@ export const ManageUsersView: React.FC<{ onSwitchToAdd?: () => void }> = ({ onSw
   const [emailModalUser, setEmailModalUser] = useState<TeamMember | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [copiedKeyMemberId, setCopiedKeyMemberId] = useState<string | null>(null);
+  const [generatingKeyId, setGeneratingKeyId] = useState<string | null>(null);
 
   const canAccess = currentUserProfile?.rank === 'Admin' || currentUserProfile?.rank === 'Manager';
+
+  if (!canAccess) {
+    return (
+      <div className="flex-1 glass-panel rounded-[32px] p-8 flex flex-col items-center justify-center text-center shadow-xl">
+        <Shield className="w-16 h-16 text-rose-500/80 mb-4 animate-bounce" />
+        <h2 className="text-2xl font-bold text-neutral-800 dark:text-white">Access Denied</h2>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-2 max-w-md">
+          Only administrators and managers have access to the user management and deletion panel.
+        </p>
+      </div>
+    );
+  }
+
+  // Handle generating or regenerating API key for a member
+  const handleGenerateApiKey = async (member: TeamMember) => {
+    setGeneratingKeyId(member.id);
+    try {
+      const newKey = await generateOrUpdateMemberApiKey(member.id);
+      setFeedbackMsg({
+        type: 'success',
+        text: `Generated AI API Key for ${member.name}: ${newKey}`
+      });
+    } catch (err: any) {
+      setFeedbackMsg({
+        type: 'error',
+        text: err.message || 'Failed to generate API Key'
+      });
+    } finally {
+      setGeneratingKeyId(null);
+      setTimeout(() => setFeedbackMsg(null), 6000);
+    }
+  };
+
+  const handleCopyKey = (key: string, memberId: string) => {
+    navigator.clipboard.writeText(key);
+    setCopiedKeyMemberId(memberId);
+    setTimeout(() => setCopiedKeyMemberId(null), 2000);
+  };
 
   if (!canAccess) {
     return (
@@ -302,7 +349,53 @@ export const ManageUsersView: React.FC<{ onSwitchToAdd?: () => void }> = ({ onSw
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0 self-end sm:self-center">
+                    {/* API Key Management */}
+                    {member.apiKey ? (
+                      <div className="flex items-center gap-1.5 bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 rounded-xl px-2.5 py-1.5">
+                        <Key className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span className="text-[10px] font-mono font-semibold text-emerald-700 dark:text-emerald-300">
+                          {member.apiKey.slice(0, 10)}...{member.apiKey.slice(-4)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyKey(member.apiKey!, member.id)}
+                          className="p-1 text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-white rounded-lg hover:bg-emerald-500/20 transition-all cursor-pointer"
+                          title="Copy AI API Key"
+                        >
+                          {copiedKeyMemberId === member.id ? (
+                            <Check className="w-3 h-3 text-emerald-500" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleGenerateApiKey(member)}
+                          disabled={generatingKeyId === member.id}
+                          className="p-1 text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-white rounded-lg hover:bg-emerald-500/20 transition-all cursor-pointer"
+                          title="Regenerate API Key"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${generatingKeyId === member.id ? 'animate-spin' : ''}`} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleGenerateApiKey(member)}
+                        disabled={generatingKeyId === member.id}
+                        className="px-3 py-2 bg-indigo-500/10 hover:bg-indigo-500 text-indigo-600 hover:text-white rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-1.5 border border-indigo-500/20"
+                        title="Generate AI API Key for this user"
+                      >
+                        {generatingKeyId === member.id ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Key className="w-3.5 h-3.5" />
+                        )}
+                        <span>Issue API Key</span>
+                      </button>
+                    )}
+
                     {member.email && (
                       <button
                         type="button"
