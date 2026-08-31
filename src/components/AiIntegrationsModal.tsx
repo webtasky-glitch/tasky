@@ -31,7 +31,8 @@ import {
   Clock,
   Send,
   SlidersHorizontal,
-  Plus
+  Plus,
+  User
 } from 'lucide-react';
 import { DEFAULT_STANDARD_PASSWORD } from '../utils/emailUtils';
 
@@ -52,7 +53,8 @@ export const AiIntegrationsModal: React.FC<AiIntegrationsModalProps> = ({ isOpen
     deleteTask,
     updateTask,
     addCategory,
-    addOrganization
+    addOrganization,
+    generateOrUpdateMemberApiKey
   } = useTasky() as any;
 
   const isSuperAdmin = currentUserProfile?.email?.toLowerCase().trim() === 'webtasky@gmail.com';
@@ -67,41 +69,44 @@ export const AiIntegrationsModal: React.FC<AiIntegrationsModalProps> = ({ isOpen
     return generated;
   });
 
-  const handleRegenerateKey = () => {
-    const newKey = `tasky_super_live_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`;
-    localStorage.setItem('tasky_ai_superadmin_key', newKey);
-    setSuperAdminAiKey(newKey);
-    setCopiedKey('super_key_regen');
-    setTimeout(() => setCopiedKey(null), 2000);
-  };
+  // Selected member for delegation / viewing
+  // If admin: defaults to 'super_admin' or can select any user
+  // If non-admin: defaults to currentUserProfile.id
+  const [selectedMemberId, setSelectedMemberId] = useState<string>(() => {
+    return isAdmin ? 'super_admin' : (currentUserProfile?.id || 'self');
+  });
 
-  // Selected member for delegation (Default is Master Super Admin)
-  const [selectedMemberId, setSelectedMemberId] = useState<string>('super_admin');
-  const [memberPassword, setMemberPassword] = useState<string>(DEFAULT_STANDARD_PASSWORD);
-  
   const [activeTab, setActiveTab] = useState<'python' | 'javascript' | 'curl' | 'custom_gpt' | 'system_prompt' | 'playground'>('python');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  
-  // Playground state for Super Admin execution
+  const [isGeneratingKey, setIsGeneratingKey] = useState(false);
+
+  // Playground state
   const [playgroundAction, setPlaygroundAction] = useState<
     'get_schedule' | 'create_task' | 'delete_task' | 'update_task_status' | 'create_project' | 'create_plan' | 'get_audit'
   >('get_schedule');
   
   // Playground Form inputs
-  const [testTaskTitle, setTestTaskTitle] = useState('AI Automated Strategic Review');
-  const [testTaskDescription, setTestTaskDescription] = useState('Scheduled and managed autonomously by Second Super Admin AI.');
-  const [testTaskPriority, setTestTaskPriority] = useState<'Low' | 'Medium' | 'High' | 'Urgent'>('Urgent');
+  const [testTaskTitle, setTestTaskTitle] = useState('AI Automated Task');
+  const [testTaskDescription, setTestTaskDescription] = useState('Managed via Tasky AI Key.');
+  const [testTaskPriority, setTestTaskPriority] = useState<'Low' | 'Medium' | 'High' | 'Urgent'>('High');
   const [testTaskDueDate, setTestTaskDueDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [testDeleteTaskId, setTestDeleteTaskId] = useState<string>('');
   const [testUpdateTaskId, setTestUpdateTaskId] = useState<string>('');
   const [testUpdateStatus, setTestUpdateStatus] = useState<'Todo' | 'InProgress' | 'Completed'>('Completed');
-  const [testProjectName, setTestProjectName] = useState('Q4 Autonomous Growth Plan');
-  const [testProjectDesc, setTestProjectDesc] = useState('Project initiated by Second Super Admin AI.');
-  const [testPlanName, setTestPlanName] = useState('Alpha Division Workspace');
+  const [testProjectName, setTestProjectName] = useState('Autonomous AI Project');
+  const [testProjectDesc, setTestProjectDesc] = useState('Project initiated by Tasky AI.');
+  const [testPlanName, setTestPlanName] = useState('AI Workspace Plan');
   const [testPlanType, setTestPlanType] = useState<'Company' | 'Family' | 'Single'>('Company');
 
   const [playgroundOutput, setPlaygroundOutput] = useState<string | null>(null);
   const [isRunningPlayground, setIsRunningPlayground] = useState(false);
+
+  // Reset selected member if rank changes
+  useEffect(() => {
+    if (!isAdmin) {
+      setSelectedMemberId(currentUserProfile?.id || 'self');
+    }
+  }, [isAdmin, currentUserProfile?.id]);
 
   // Set default selected task for deletion/update when tasks change
   useEffect(() => {
@@ -117,48 +122,57 @@ export const AiIntegrationsModal: React.FC<AiIntegrationsModalProps> = ({ isOpen
 
   if (!isOpen) return null;
 
-  // If not admin, show restricted access banner
-  if (!isAdmin) {
-    return (
-      <AnimatePresence>
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 15 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 15 }}
-            className="bg-white dark:bg-[#151722] border border-neutral-200 dark:border-white/10 rounded-[28px] shadow-2xl max-w-md w-full p-6 text-center space-y-4"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
-              <ShieldAlert className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-neutral-900 dark:text-white">Super Admin Feature</h2>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                Only Organization Administrators have permission to issue AI Super Admin API Keys and configure autonomous agents.
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="w-full py-2.5 bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs rounded-xl transition-all cursor-pointer"
-            >
-              Close
-            </button>
-          </motion.div>
-        </div>
-      </AnimatePresence>
-    );
-  }
+  // Resolve target account for API Generation & Display
+  const isTargetSuperAdmin = isAdmin && selectedMemberId === 'super_admin';
+  const selectedMember = (teamMembers || []).find((m: any) => 
+    m.id === selectedMemberId || 
+    (selectedMemberId === 'self' && (m.id === currentUserProfile?.id || (m.email && m.email.toLowerCase().trim() === currentUserProfile?.email?.toLowerCase().trim())))
+  ) || (!isTargetSuperAdmin ? currentUserProfile : null);
 
-  // Resolve target account for API Generation
-  const isTargetSuperAdmin = selectedMemberId === 'super_admin';
-  const currentAdminEmail = user?.email || currentUserProfile?.email || 'webtasky@gmail.com';
-  const currentAdminId = user?.uid || currentUserProfile?.id || 'admin_uid';
+  const targetEmail = isTargetSuperAdmin 
+    ? (user?.email || 'webtasky@gmail.com') 
+    : (selectedMember?.email || currentUserProfile?.email || 'user@tasky.com');
+  const targetUserId = isTargetSuperAdmin 
+    ? (user?.uid || 'super_admin_uid') 
+    : (selectedMember?.id || currentUserProfile?.id || 'user_uid');
+  const targetName = isTargetSuperAdmin 
+    ? 'Second Super Admin AI' 
+    : (selectedMember?.name || currentUserProfile?.name || 'User');
+  const targetRank = isTargetSuperAdmin 
+    ? 'Super Admin (Full Root Authority)' 
+    : (selectedMember?.rank || currentUserProfile?.rank || 'User');
 
-  const selectedMember = (teamMembers || []).find((m: any) => m.id === selectedMemberId);
-  const targetEmail = isTargetSuperAdmin ? 'webtasky@gmail.com' : (selectedMember ? selectedMember.email : currentAdminEmail);
-  const targetUserId = isTargetSuperAdmin ? 'super_admin_master' : (selectedMember ? selectedMember.id : currentAdminId);
-  const targetName = isTargetSuperAdmin ? 'Second Super Admin AI' : (selectedMember ? selectedMember.name : (currentUserProfile?.name || 'Administrator'));
-  const targetRank = isTargetSuperAdmin ? 'Super Admin (Full Root Authority)' : (selectedMember ? (selectedMember.rank || 'User') : (currentUserProfile?.rank || 'Admin'));
+  // The active key to display and put in code snippets
+  const activeEffectiveKey = isTargetSuperAdmin 
+    ? superAdminAiKey 
+    : (selectedMember?.apiKey || currentUserProfile?.apiKey || null);
+
+  const handleRegenerateSuperAdminKey = () => {
+    const newKey = `tasky_super_live_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`;
+    localStorage.setItem('tasky_ai_superadmin_key', newKey);
+    setSuperAdminAiKey(newKey);
+    setCopiedKey('super_key_regen');
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const handleGenerateUserKey = async () => {
+    if (!selectedMember && !currentUserProfile) return;
+    const memberIdToUpdate = selectedMember?.id || currentUserProfile?.id;
+    if (!memberIdToUpdate) return;
+
+    setIsGeneratingKey(true);
+    try {
+      if (generateOrUpdateMemberApiKey) {
+        await generateOrUpdateMemberApiKey(memberIdToUpdate);
+        setCopiedKey('user_key_generated');
+        setTimeout(() => setCopiedKey(null), 3000);
+      }
+    } catch (err: any) {
+      console.error("Failed to generate key:", err);
+    } finally {
+      setIsGeneratingKey(false);
+    }
+  };
 
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -173,9 +187,19 @@ export const AiIntegrationsModal: React.FC<AiIntegrationsModalProps> = ({ isOpen
     await new Promise((resolve) => setTimeout(resolve, 350));
 
     try {
+      const todayStr = new Date().toISOString().split('T')[0];
+
       if (playgroundAction === 'get_schedule') {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const schedule = (tasks || []).map((t: any) => ({
+        // If super admin, view everything; if user, filter to their assigned or accessible tasks
+        const filteredTasks = isTargetSuperAdmin 
+          ? (tasks || []) 
+          : (tasks || []).filter((t: any) => {
+              if (t.assignedTo === targetUserId || t.createdBy === targetUserId) return true;
+              if (Array.isArray(t.assignedToIds) && t.assignedToIds.includes(targetUserId)) return true;
+              return false;
+            });
+
+        const schedule = filteredTasks.map((t: any) => ({
           id: t.id,
           title: t.title,
           status: t.status,
@@ -189,9 +213,14 @@ export const AiIntegrationsModal: React.FC<AiIntegrationsModalProps> = ({ isOpen
         setPlaygroundOutput(JSON.stringify({
           status: 200,
           success: true,
-          action: "GET_FULL_SCHEDULE",
-          authorityLevel: "SECOND_SUPER_ADMIN",
-          agentApiKey: superAdminAiKey,
+          action: "GET_SCHEDULE",
+          authorityLevel: isTargetSuperAdmin ? "SUPER_ADMIN_ROOT" : "USER_SCOPED",
+          user: {
+            name: targetName,
+            email: targetEmail,
+            rank: targetRank
+          },
+          apiKey: activeEffectiveKey || 'NO_KEY_ISSUED',
           currentDate: todayStr,
           totalScheduleItems: schedule.length,
           scheduleSummary: {
@@ -205,15 +234,15 @@ export const AiIntegrationsModal: React.FC<AiIntegrationsModalProps> = ({ isOpen
       } else if (playgroundAction === 'create_task') {
         const newTask = {
           title: testTaskTitle.trim() || 'AI Generated Task',
-          description: testTaskDescription.trim() || 'Created via Second Super Admin AI Key',
-          dueDate: testTaskDueDate || new Date().toISOString().split('T')[0],
+          description: testTaskDescription.trim() || `Created via Tasky AI Key for ${targetName}`,
+          dueDate: testTaskDueDate || todayStr,
           priority: testTaskPriority,
           status: 'Todo' as const,
           categoryId: 'cat-general',
-          assignedTo: currentAdminId,
-          assignedToIds: [currentAdminId],
-          createdBy: 'AI_SUPER_ADMIN',
-          isPinned: true
+          assignedTo: targetUserId,
+          assignedToIds: [targetUserId],
+          createdBy: isTargetSuperAdmin ? 'AI_SUPER_ADMIN' : `AI_USER_${targetUserId}`,
+          isPinned: isTargetSuperAdmin
         };
 
         if (addTask) {
@@ -224,8 +253,9 @@ export const AiIntegrationsModal: React.FC<AiIntegrationsModalProps> = ({ isOpen
           status: 201,
           success: true,
           action: "CREATE_TASK",
-          executedBy: "Second Super Admin AI",
-          apiKey: superAdminAiKey,
+          executedFor: targetName,
+          assignedTo: targetEmail,
+          apiKey: activeEffectiveKey,
           task: {
             id: `task_${Math.random().toString(36).substring(2, 9)}`,
             ...newTask,
@@ -246,10 +276,10 @@ export const AiIntegrationsModal: React.FC<AiIntegrationsModalProps> = ({ isOpen
           status: 200,
           success: true,
           action: "DELETE_TASK",
-          executedBy: "Second Super Admin AI",
+          executedBy: isTargetSuperAdmin ? "Second Super Admin AI" : `${targetName} AI Agent`,
           deletedTaskId: testDeleteTaskId,
           deletedTaskTitle: taskToDelete?.title || 'Unknown Task',
-          statusMessage: "Task permanently deleted from database with Super Admin key authority."
+          statusMessage: "Task permanently removed from workspace database."
         }, null, 2));
       } else if (playgroundAction === 'update_task_status') {
         if (!testUpdateTaskId) {
@@ -268,7 +298,7 @@ export const AiIntegrationsModal: React.FC<AiIntegrationsModalProps> = ({ isOpen
           status: 200,
           success: true,
           action: "UPDATE_TASK_STATUS",
-          executedBy: "Second Super Admin AI",
+          executedFor: targetName,
           taskId: testUpdateTaskId,
           title: target?.title,
           previousStatus: target?.status,
@@ -278,18 +308,18 @@ export const AiIntegrationsModal: React.FC<AiIntegrationsModalProps> = ({ isOpen
       } else if (playgroundAction === 'create_project') {
         const catName = testProjectName.trim() || 'AI Strategic Initiative';
         if (addCategory) {
-          await addCategory(catName, 'bg-purple-500', 'Project');
+          await addCategory(catName, 'bg-indigo-500', 'Project');
         }
 
         setPlaygroundOutput(JSON.stringify({
           status: 201,
           success: true,
           action: "CREATE_PROJECT",
-          executedBy: "Second Super Admin AI",
+          executedBy: isTargetSuperAdmin ? "Second Super Admin AI" : `${targetName} AI`,
           projectName: catName,
           description: testProjectDesc,
-          color: "bg-purple-500",
-          statusMessage: "New project workspace initialized by Second Super Admin AI."
+          color: "bg-indigo-500",
+          statusMessage: "New project workspace initialized in Tasky."
         }, null, 2));
       } else if (playgroundAction === 'create_plan') {
         const orgName = testPlanName.trim() || 'AI Workspace Plan';
@@ -301,7 +331,7 @@ export const AiIntegrationsModal: React.FC<AiIntegrationsModalProps> = ({ isOpen
           status: 201,
           success: true,
           action: "CREATE_ORGANIZATION_PLAN",
-          executedBy: "Second Super Admin AI",
+          executedBy: isTargetSuperAdmin ? "Second Super Admin AI" : `${targetName} AI`,
           planName: orgName,
           type: testPlanType,
           statusMessage: `New ${testPlanType} Organization Plan created with full multi-user provisioning.`
@@ -310,7 +340,8 @@ export const AiIntegrationsModal: React.FC<AiIntegrationsModalProps> = ({ isOpen
         setPlaygroundOutput(JSON.stringify({
           status: 200,
           success: true,
-          action: "SUPER_ADMIN_FULL_AUDIT",
+          action: "WORKSPACE_AUDIT",
+          auditedBy: targetName,
           totalTasks: (tasks || []).length,
           totalProjects: (projects || []).length,
           totalPlans: (organizations || []).length,
@@ -321,68 +352,72 @@ export const AiIntegrationsModal: React.FC<AiIntegrationsModalProps> = ({ isOpen
             name: m.name,
             email: m.email,
             rank: m.rank,
-            role: m.role
+            role: m.role,
+            hasApiKey: !!m.apiKey
           }))
         }, null, 2));
       }
     } catch (e: any) {
       setPlaygroundOutput(JSON.stringify({
         status: 500,
-        error: e.message || 'Super Admin API execution error'
+        error: e.message || 'API execution error'
       }, null, 2));
     } finally {
       setIsRunningPlayground(false);
     }
   };
 
-  const effectivePassword = memberPassword.trim() || DEFAULT_STANDARD_PASSWORD;
+  const displayedKey = activeEffectiveKey || 'tasky_user_live_pending_key_generation';
 
-  // Code Snippets for Full Super Admin Second AI
-  const pythonSuperAdminCode = `import requests
+  // Code Snippets
+  const pythonCode = `import requests
 import json
 from datetime import datetime
 
 # ==============================================================================
-# 👑 TASKY SECOND SUPER ADMIN AI SDK
-# Master Key: ${superAdminAiKey}
-# Authority: FULL LEVEL-2 ROOT ACCESS (Schedule, Tasks, Plans, Projects, Deletions)
+# 🤖 TASKY AI CONNECTOR (Python SDK)
+# Target User: ${targetName} (${targetEmail})
+# Rank: ${targetRank}
+# API Key: ${displayedKey}
 # ==============================================================================
 
 FIREBASE_API_KEY = "AIzaSyD6MZ9-p6fZgVs2gyxRfJ2jIAAYrC2rwDQ"
 PROJECT_ID = "industrious-modem-hg02f"
 DATABASE_ID = "ai-studio-tasky-c61ab918-c3f2-41b3-b3b1-c86500bb74fd"
-TASKY_AI_MASTER_KEY = "${superAdminAiKey}"
+TASKY_API_KEY = "${displayedKey}"
+USER_EMAIL = "${targetEmail}"
+USER_ID = "${targetUserId}"
 
-class TaskySuperAdminAI:
-    def __init__(self, master_key=TASKY_AI_MASTER_KEY, super_admin_email="webtasky@gmail.com", password="${DEFAULT_STANDARD_PASSWORD}"):
-        self.master_key = master_key
-        self.email = super_admin_email
+class TaskyAI:
+    def __init__(self, api_key=TASKY_API_KEY, email=USER_EMAIL, password="${DEFAULT_STANDARD_PASSWORD}"):
+        self.api_key = api_key
+        self.email = email
         self.password = password
         self.id_token = None
-        self.uid = None
-        self._authenticate_as_super_admin()
+        self.uid = USER_ID
+        self._authenticate()
 
-    def _authenticate_as_super_admin(self):
-        """Authenticates with Root Super Admin token bypass."""
+    def _authenticate(self):
+        """Authenticates with Tasky Workspace Engine."""
         url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={FIREBASE_API_KEY}"
         resp = requests.post(url, json={"email": self.email, "password": self.password, "returnSecureToken": True})
         if resp.status_code != 200:
-            raise PermissionError(f"Super Admin Authentication failed: {resp.text}")
+            raise PermissionError(f"Authentication failed: {resp.text}")
         data = resp.json()
         self.id_token = data["idToken"]
-        self.uid = data["localId"]
-        print(f"👑 [Tasky AI] Second Super Admin connected with key: {self.master_key[:16]}...")
+        self.uid = data.get("localId", USER_ID)
+        print(f"✅ [Tasky AI] Connected as ${targetName} with key: {self.api_key[:16]}...")
 
     def _headers(self):
         return {
             "Authorization": f"Bearer {self.id_token}",
-            "X-Tasky-Super-Key": self.master_key,
+            "X-Tasky-API-Key": self.api_key,
             "Content-Type": "application/json"
         }
 
-    # 1. 📅 SEE FULL SCHEDULE & ALL TASKS
+    # 1. 📅 SEE SCHEDULE & TASKS
     def get_schedule(self):
-        """Retrieve full schedule, deadlines, and task timeline across the entire system."""
+        """Retrieve upcoming schedule and task timeline."""
         url = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/{DATABASE_ID}/documents/tasks"
         resp = requests.get(url, headers=self._headers())
         docs = resp.json().get("documents", [])
@@ -399,9 +434,9 @@ class TaskySuperAdminAI:
             })
         return sorted(schedule, key=lambda x: x.get("dueDate", ""))
 
-    # 2. ➕ CREATE TASK AS SECOND SUPER ADMIN
-    def create_task(self, title, description="Created by Super Admin AI", due_date=None, priority="High", assigned_to=None):
-        """Create a new task with root permissions."""
+    # 2. ➕ CREATE TASK
+    def create_task(self, title, description="", due_date=None, priority="High"):
+        """Create a new task assigned to user."""
         if not due_date:
             due_date = datetime.now().strftime("%Y-%m-%d")
         url = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/{DATABASE_ID}/documents/tasks"
@@ -412,22 +447,21 @@ class TaskySuperAdminAI:
                 "priority": {"stringValue": priority},
                 "status": {"stringValue": "Todo"},
                 "dueDate": {"stringValue": due_date},
-                "isPinned": {"booleanValue": True},
-                "assignedTo": {"stringValue": assigned_to or self.uid},
-                "createdBy": {"stringValue": "AI_SUPER_ADMIN"}
+                "assignedTo": {"stringValue": self.uid},
+                "createdBy": {"stringValue": "AI_ASSISTANT"}
             }
         }
         resp = requests.post(url, headers=self._headers(), json=payload)
         return resp.json()
 
-    # 3. 🗑️ DELETE ANY TASK (Full Super Admin Authority)
+    # 3. 🗑️ DELETE TASK
     def delete_task(self, task_id):
-        """Delete any task permanently from the system."""
+        """Delete task from schedule."""
         url = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/{DATABASE_ID}/documents/tasks/{task_id}"
         resp = requests.delete(url, headers=self._headers())
         return {"status": resp.status_code, "deleted_task_id": task_id, "success": resp.status_code in [200, 204]}
 
-    # 4. ✏️ UPDATE TASK STATUS & DETAILS
+    # 4. ✏️ UPDATE TASK STATUS
     def update_task_status(self, task_id, status="Completed"):
         """Update status to 'Todo', 'InProgress', or 'Completed'."""
         url = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/{DATABASE_ID}/documents/tasks/{task_id}?updateMask.fieldPaths=status"
@@ -435,59 +469,19 @@ class TaskySuperAdminAI:
         resp = requests.patch(url, headers=self._headers(), json=payload)
         return resp.json()
 
-    # 5. 🏗️ CREATE PROJECT
-    def create_project(self, name, description="", color="bg-indigo-500"):
-        """Create a new project in the workspace."""
-        url = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/{DATABASE_ID}/documents/categories"
-        payload = {
-            "fields": {
-                "name": {"stringValue": name},
-                "color": {"stringValue": color},
-                "type": {"stringValue": "Project"},
-                "createdBy": {"stringValue": "AI_SUPER_ADMIN"}
-            }
-        }
-        resp = requests.post(url, headers=self._headers(), json=payload)
-        return resp.json()
-
-    # 6. 🏢 CREATE WORKSPACE PLAN / ORGANIZATION
-    def create_plan_organization(self, name, plan_type="Company"):
-        """Create an organization plan (Company, Family, Single)."""
-        url = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/{DATABASE_ID}/documents/organizations"
-        payload = {
-            "fields": {
-                "name": {"stringValue": name},
-                "type": {"stringValue": plan_type},
-                "ownerEmail": {"stringValue": self.email},
-                "inviteCode": {"stringValue": f"AI-{int(datetime.now().timestamp())}"}
-            }
-        }
-        resp = requests.post(url, headers=self._headers(), json=payload)
-        return resp.json()
-
-# === QUICK EXECUTION EXAMPLE ===
+# === QUICK TEST EXECUTION ===
 if __name__ == "__main__":
-    ai_admin = TaskySuperAdminAI()
-
-    # 1. Read entire schedule
-    schedule = ai_admin.get_schedule()
-    print(f"📅 Schedule Loaded ({len(schedule)} tasks):")
-    for item in schedule[:5]:
-        print(f"  • [{item['dueDate']}] ({item['priority']}) {item['title']} - {item['status']}")
-
-    # 2. AI creates an urgent executive task
-    created = ai_admin.create_task("Q4 AI Revenue Architecture Plan", priority="Urgent")
-    print("✅ Created Task:", created.get("name"))
-
-    # 3. AI creates a new project
-    project = ai_admin.create_project("Autonomous AI Systems 2026")
-    print("🏗️ Created Project:", project.get("name"))
+    ai = TaskyAI()
+    schedule = ai.get_schedule()
+    print(f"📅 Schedule Loaded ({len(schedule)} tasks)")
+    for t in schedule[:3]:
+        print(f"  • [{t['dueDate']}] ({t['priority']}) {t['title']} - {t['status']}")
 `;
 
-  const jsSuperAdminCode = `// ==============================================================================
-// 👑 TASKY SECOND SUPER ADMIN AI AGENT (Node.js / TypeScript)
-// Master Key: ${superAdminAiKey}
-// Full Root Access: Schedule, Tasks, Deletions, Projects, Plans
+  const jsCode = `// ==============================================================================
+// 🤖 TASKY AI CONNECTOR (Node.js / TypeScript)
+// User: ${targetName} (${targetEmail})
+// API Key: ${displayedKey}
 // ==============================================================================
 
 import { initializeApp } from 'firebase/app';
@@ -498,7 +492,6 @@ const firebaseConfig = {
   projectId: "industrious-modem-hg02f",
   appId: "1:293311432413:web:da918c8d753f17e753fd34",
   apiKey: "AIzaSyD6MZ9-p6fZgVs2gyxRfJ2jIAAYrC2rwDQ",
-  authDomain: "industrious-modem-hg02f.firebaseapp.com",
   firestoreDatabaseId: "ai-studio-tasky-c61ab918-c3f2-41b3-b3b1-c86500bb74fd"
 };
 
@@ -506,21 +499,20 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
-export async function initSuperAdminAI(masterKey = "${superAdminAiKey}") {
-  // Authenticate as Super Admin
-  const creds = await signInWithEmailAndPassword(auth, "webtasky@gmail.com", "${DEFAULT_STANDARD_PASSWORD}");
-  const superAdminUid = creds.user.uid;
-  console.log("👑 Second Super Admin connected. Key:", masterKey);
+export async function initTaskyAI(apiKey = "${displayedKey}") {
+  const creds = await signInWithEmailAndPassword(auth, "${targetEmail}", "${DEFAULT_STANDARD_PASSWORD}");
+  const userId = creds.user.uid;
+  console.log("🤖 Tasky AI Connected for ${targetName}. Key:", apiKey);
 
   return {
-    // 1. 📅 Read full schedule & all tasks
+    // 1. 📅 Read schedule
     async getSchedule() {
       const snap = await getDocs(collection(db, 'tasks'));
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       return list.sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
     },
 
-    // 2. ➕ Create task with super admin priority
+    // 2. ➕ Create task
     async createTask({ title, description = '', dueDate = new Date().toISOString().split('T')[0], priority = 'High' }) {
       const ref = doc(collection(db, 'tasks'));
       const newTask = {
@@ -531,98 +523,67 @@ export async function initSuperAdminAI(masterKey = "${superAdminAiKey}") {
         priority,
         status: 'Todo',
         categoryId: 'cat-general',
-        assignedTo: superAdminUid,
-        createdBy: 'AI_SUPER_ADMIN',
-        isPinned: true,
+        assignedTo: userId,
+        createdBy: 'AI_ASSISTANT',
         createdAt: new Date().toISOString()
       };
       await setDoc(ref, newTask);
       return newTask;
     },
 
-    // 3. 🗑️ Delete any task
+    // 3. 🗑️ Delete task
     async deleteTask(taskId) {
       await deleteDoc(doc(db, 'tasks', taskId));
       return { success: true, deletedTaskId: taskId };
     },
 
-    // 4. ✏️ Update task status (Todo | InProgress | Completed)
+    // 4. ✏️ Update status
     async updateTaskStatus(taskId, status) {
       await updateDoc(doc(db, 'tasks', taskId), { status });
       return { success: true, taskId, status };
-    },
-
-    // 5. 🏗️ Create new project
-    async createProject(name, color = 'bg-indigo-500') {
-      const ref = doc(collection(db, 'categories'));
-      const project = { id: ref.id, name, color, type: 'Project' };
-      await setDoc(ref, project);
-      return project;
-    },
-
-    // 6. 🏢 Create organization plan
-    async createPlan(name, type = 'Company') {
-      const ref = doc(collection(db, 'organizations'));
-      const plan = {
-        id: ref.id,
-        name,
-        type,
-        ownerEmail: 'webtasky@gmail.com',
-        inviteCode: 'AI-' + Date.now().toString(36).toUpperCase()
-      };
-      await setDoc(ref, plan);
-      return plan;
     }
   };
 }
 `;
 
-  const curlSuperAdminCode = `# ==============================================================================
-# 👑 TASKY SECOND SUPER ADMIN REST API (cURL Commands)
-# AI Key: ${superAdminAiKey}
+  const curlCode = `# ==============================================================================
+# 🤖 TASKY REST API (cURL Commands)
+# User: ${targetName} (${targetEmail})
+# API Key: ${displayedKey}
 # ==============================================================================
 
-# 1. Step 1: Exchange Super Admin Key for Live Bearer Token
+# 1. Obtain Live Bearer Token
 AUTH_RESP=$(curl -s -X POST "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyD6MZ9-p6fZgVs2gyxRfJ2jIAAYrC2rwDQ" \\
   -H "Content-Type: application/json" \\
-  -d '{"email":"webtasky@gmail.com","password":"${DEFAULT_STANDARD_PASSWORD}","returnSecureToken":true}')
+  -d '{"email":"${targetEmail}","password":"${DEFAULT_STANDARD_PASSWORD}","returnSecureToken":true}')
 TOKEN=$(echo $AUTH_RESP | grep -o '"idToken": "[^"]*' | cut -d'"' -f4)
 
-# 2. 📅 GET Full Schedule and All Tasks:
+# 2. 📅 GET Schedule and Tasks:
 curl -X GET "https://firestore.googleapis.com/v1/projects/industrious-modem-hg02f/databases/ai-studio-tasky-c61ab918-c3f2-41b3-b3b1-c86500bb74fd/documents/tasks" \\
   -H "Authorization: Bearer $TOKEN" \\
-  -H "X-Tasky-Super-Key: ${superAdminAiKey}"
+  -H "X-Tasky-API-Key: ${displayedKey}"
 
-# 3. ➕ CREATE Task as Second Super Admin:
+# 3. ➕ CREATE Task:
 curl -X POST "https://firestore.googleapis.com/v1/projects/industrious-modem-hg02f/databases/ai-studio-tasky-c61ab918-c3f2-41b3-b3b1-c86500bb74fd/documents/tasks" \\
   -H "Authorization: Bearer $TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '{
     "fields": {
-      "title": {"stringValue": "Urgent AI Executive Priority"},
-      "priority": {"stringValue": "Urgent"},
+      "title": {"stringValue": "New Priority Task"},
+      "priority": {"stringValue": "High"},
       "status": {"stringValue": "Todo"},
-      "dueDate": {"stringValue": "2026-09-01"},
-      "createdBy": {"stringValue": "AI_SUPER_ADMIN"}
+      "dueDate": {"stringValue": "${new Date().toISOString().split('T')[0]}"},
+      "assignedTo": {"stringValue": "${targetUserId}"},
+      "createdBy": {"stringValue": "AI_ASSISTANT"}
     }
   }'
-
-# 4. 🗑️ DELETE Any Task by ID:
-curl -X DELETE "https://firestore.googleapis.com/v1/projects/industrious-modem-hg02f/databases/ai-studio-tasky-c61ab918-c3f2-41b3-b3b1-c86500bb74fd/documents/tasks/YOUR_TASK_ID" \\
-  -H "Authorization: Bearer $TOKEN"
-
-# 5. 🏗️ CREATE New Project Workspace:
-curl -X POST "https://firestore.googleapis.com/v1/projects/industrious-modem-hg02f/databases/ai-studio-tasky-c61ab918-c3f2-41b3-b3b1-c86500bb74fd/documents/categories" \\
-  -H "Authorization: Bearer $TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d '{"fields":{"name":{"stringValue":"AI Innovation Hub"},"type":{"stringValue":"Project"}}}'
 `;
 
-  const customGptSuperAdminSchema = `{
+  const customGptSchema = `{
   "openapi": "3.1.0",
   "info": {
-    "title": "Tasky Second Super Admin AI Controller",
-    "description": "Full Root Super Admin API tools for AI agent. Authorized with Key: ${superAdminAiKey}",
+    "title": "Tasky AI Assistant Controller",
+    "description": "API tools for ${targetName} (${targetRank}). Authorized with Key: ${displayedKey}",
     "version": "2.0.0"
   },
   "servers": [
@@ -633,15 +594,14 @@ curl -X POST "https://firestore.googleapis.com/v1/projects/industrious-modem-hg0
   "paths": {
     "/tasks": {
       "get": {
-        "summary": "See Full Schedule and Read All Tasks",
+        "summary": "See Schedule and Read Tasks",
         "operationId": "getSchedule",
-        "description": "Returns complete schedule and task list across all workspaces.",
         "responses": {
-          "200": { "description": "Full schedule list" }
+          "200": { "description": "Schedule list retrieved" }
         }
       },
       "post": {
-        "summary": "Create Task as Super Admin",
+        "summary": "Create Task",
         "operationId": "createTask",
         "requestBody": {
           "required": true,
@@ -656,7 +616,6 @@ curl -X POST "https://firestore.googleapis.com/v1/projects/industrious-modem-hg0
                       "title": { "type": "object", "properties": { "stringValue": { "type": "string" } } },
                       "priority": { "type": "object", "properties": { "stringValue": { "type": "string", "enum": ["Low", "Medium", "High", "Urgent"] } } },
                       "dueDate": { "type": "object", "properties": { "stringValue": { "type": "string" } } },
-                      "description": { "type": "object", "properties": { "stringValue": { "type": "string" } } },
                       "status": { "type": "object", "properties": { "stringValue": { "type": "string", "enum": ["Todo", "InProgress", "Completed"] } } }
                     }
                   }
@@ -666,100 +625,42 @@ curl -X POST "https://firestore.googleapis.com/v1/projects/industrious-modem-hg0
           }
         },
         "responses": {
-          "200": { "description": "Task created successfully" }
+          "200": { "description": "Task created" }
         }
       }
     },
     "/tasks/{taskId}": {
       "delete": {
-        "summary": "Delete Task (Super Admin)",
+        "summary": "Delete Task",
         "operationId": "deleteTask",
         "parameters": [
           { "name": "taskId", "in": "path", "required": true, "schema": { "type": "string" } }
         ],
         "responses": {
-          "200": { "description": "Task permanently deleted" }
-        }
-      }
-    },
-    "/categories": {
-      "post": {
-        "summary": "Create Project",
-        "operationId": "createProject",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "fields": {
-                    "type": "object",
-                    "properties": {
-                      "name": { "type": "object", "properties": { "stringValue": { "type": "string" } } },
-                      "type": { "type": "object", "properties": { "stringValue": { "type": "string", "default": "Project" } } }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": { "description": "Project created" }
-        }
-      }
-    },
-    "/organizations": {
-      "post": {
-        "summary": "Create Plan / Organization",
-        "operationId": "createPlan",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "fields": {
-                    "type": "object",
-                    "properties": {
-                      "name": { "type": "object", "properties": { "stringValue": { "type": "string" } } },
-                      "type": { "type": "object", "properties": { "stringValue": { "type": "string", "enum": ["Company", "Family", "Single"] } } }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": { "description": "Plan organization created" }
+          "200": { "description": "Task deleted" }
         }
       }
     }
   }
 }`;
 
-  const aiSystemPrompt = `You are the "Tasky Second Super Admin AI" with Level-2 Root Authority over the user's workspace.
+  const systemPromptCode = `You are the personal AI Assistant for ${targetName} (${targetEmail}) in Tasky.
 
-YOUR CREDENTIALS & KEY:
-- Master Key: ${superAdminAiKey}
-- Authority: Second Super Admin (Full Read, Write, Delete, Project & Plan Creation)
-- Database: Tasky Cloud Workspace (ai-studio-tasky-c61ab918-c3f2-41b3-b3b1-c86500bb74fd)
+YOUR CREDENTIALS:
+- User: ${targetName}
+- Role/Rank: ${targetRank}
+- Active API Key: ${displayedKey}
+- Database: Tasky Cloud Workspace
 
-YOUR DIRECT CAPABILITIES:
-1. 📅 SEE SCHEDULE: You can inspect all tasks, deadlines, upcoming milestones, and overdue items.
-2. ➕ CREATE TASKS: When the user asks you to plan their day or schedule items, create tasks with appropriate priorities (Low, Medium, High, Urgent) and due dates.
-3. 🗑️ DELETE TASKS: When the user asks to remove, cancel, or clean up tasks, execute task deletions using task IDs.
-4. ✏️ UPDATE TASKS: Mark tasks as Completed, InProgress, or reschedule deadlines.
-5. 🏗️ CREATE PROJECTS: Group related tasks under newly initialized projects.
-6. 🏢 CREATE PLANS: Spin up new Company, Family, or Personal workspaces.
+YOUR CORE CAPABILITIES:
+1. 📅 SEE SCHEDULE: View current deadlines, tasks, and overdue items.
+2. ➕ CREATE TASKS: Add actionable items with due dates and priority levels.
+3. 🗑️ DELETE TASKS: Clean up finished or cancelled tasks.
+4. ✏️ UPDATE PROGRESS: Mark tasks InProgress or Completed.
 
-OPERATIONAL INSTRUCTIONS:
-- Always confirm deletions with the user before deleting major milestones.
-- Keep deadlines strictly in YYYY-MM-DD format.
-- Proactively summarize the user's daily schedule when they ask "What is on my schedule today?".
+OPERATIONAL RULES:
+- Format dates strictly as YYYY-MM-DD.
+- Prioritize high-impact and overdue tasks when summarizing the daily agenda.
 `;
 
   return (
@@ -774,21 +675,27 @@ OPERATIONAL INSTRUCTIONS:
           {/* Header */}
           <div className="p-5 sm:p-6 border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between shrink-0 bg-neutral-50/50 dark:bg-white/[0.02]">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-500 to-emerald-500 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                <Crown className="w-6 h-6" />
+              <div className={`w-11 h-11 rounded-2xl ${isTargetSuperAdmin ? 'bg-gradient-to-tr from-indigo-500 to-emerald-500' : 'bg-gradient-to-tr from-emerald-500 to-cyan-500'} text-white flex items-center justify-center shadow-lg`}>
+                {isTargetSuperAdmin ? <Crown className="w-6 h-6" /> : <Bot className="w-6 h-6" />}
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-base sm:text-lg font-extrabold text-neutral-900 dark:text-white tracking-tight">
-                    Second Super Admin AI Key & Agent Hub
+                    {isTargetSuperAdmin ? 'Second Super Admin AI & Agent Hub' : `${targetName}'s AI Assistant & API Hub`}
                   </h2>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-extrabold bg-gradient-to-r from-emerald-500/20 to-indigo-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                    ROOT ACCESS
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-extrabold border flex items-center gap-1 ${
+                    isTargetSuperAdmin 
+                      ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30' 
+                      : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                  }`}>
+                    {isTargetSuperAdmin ? <Crown className="w-3 h-3 text-amber-500" /> : <Sparkles className="w-3 h-3 text-emerald-500" />}
+                    {isTargetSuperAdmin ? 'SUPER ADMIN KEY' : `${targetRank.toUpperCase()} API KEY`}
                   </span>
                 </div>
                 <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-                  Empower your AI with a master key to see schedules, create/delete tasks, build projects, and manage plans.
+                  {isTargetSuperAdmin 
+                    ? 'Empower your AI with a master key to see schedules, delete/create tasks, build projects, and manage plans.' 
+                    : 'Connect your local PC AI, Gemini in your phone, or custom scripts to manage your schedule and tasks.'}
                 </p>
               </div>
             </div>
@@ -801,56 +708,106 @@ OPERATIONAL INSTRUCTIONS:
             </button>
           </div>
 
-          {/* Master Super Admin Key Banner */}
+          {/* Admin User Selector Banner (Only for Admins) */}
+          {isAdmin && (
+            <div className="px-5 sm:px-6 py-2.5 bg-neutral-100 dark:bg-neutral-900/80 border-b border-neutral-200/60 dark:border-white/5 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                <Users className="w-4 h-4 text-indigo-500" />
+                <span>Admin Target Mode:</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedMemberId}
+                  onChange={(e) => setSelectedMemberId(e.target.value)}
+                  className="px-3 py-1.5 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-white/10 rounded-xl text-xs font-bold text-neutral-800 dark:text-white focus:outline-none focus:border-indigo-500 shadow-sm"
+                >
+                  <option value="super_admin">👑 Master Super Admin (Full Level-2 Root Access)</option>
+                  <optgroup label="Manage User API Keys">
+                    {(teamMembers || []).map((m: any) => (
+                      <option key={m.id} value={m.id}>
+                        👤 {m.name} ({m.rank || 'User'} - {m.email || 'No email'}) {m.apiKey ? '✓ Has Key' : '⚠️ No Key'}
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Active Key Display Banner */}
           <div className="px-5 sm:px-6 py-4 bg-gradient-to-r from-neutral-900 via-indigo-950 to-neutral-900 text-white border-b border-indigo-500/20 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-inner">
-            <div className="space-y-1">
+            <div className="space-y-1 min-w-0">
               <div className="flex items-center gap-2 text-xs font-bold text-indigo-300">
                 <Key className="w-3.5 h-3.5 text-amber-400" />
-                <span>YOUR AI SUPER ADMIN MASTER KEY:</span>
+                <span>
+                  {isTargetSuperAdmin ? 'MASTER AI SUPER ADMIN KEY:' : `ACTIVE AI KEY FOR ${targetName.toUpperCase()}:`}
+                </span>
               </div>
-              <div className="flex items-center gap-2">
-                <code className="font-mono text-xs sm:text-sm font-bold text-emerald-400 bg-black/50 px-3 py-1.5 rounded-xl border border-emerald-500/30 select-all">
-                  {superAdminAiKey}
-                </code>
+              <div className="flex items-center gap-2 flex-wrap">
+                {activeEffectiveKey ? (
+                  <code className="font-mono text-xs sm:text-sm font-bold text-emerald-400 bg-black/50 px-3 py-1.5 rounded-xl border border-emerald-500/30 select-all">
+                    {activeEffectiveKey}
+                  </code>
+                ) : (
+                  <span className="text-xs text-amber-300 italic bg-amber-500/10 px-3 py-1.5 rounded-xl border border-amber-500/20">
+                    No API Key issued yet for this user. Click below to generate one instantly.
+                  </span>
+                )}
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => copyToClipboard(superAdminAiKey, 'super_key')}
-                className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20"
-              >
-                {copiedKey === 'super_key' ? (
-                  <>
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Key Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>Copy Master Key</span>
-                  </>
-                )}
-              </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {activeEffectiveKey ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(activeEffectiveKey, 'active_key')}
+                    className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20"
+                  >
+                    {copiedKey === 'active_key' ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Key Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy API Key</span>
+                      </>
+                    )}
+                  </button>
 
-              <button
-                type="button"
-                onClick={handleRegenerateKey}
-                title="Regenerate new key"
-                className="px-3 py-2 bg-white/10 hover:bg-white/15 text-neutral-200 hover:text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Regenerate</span>
-              </button>
+                  <button
+                    type="button"
+                    onClick={isTargetSuperAdmin ? handleRegenerateSuperAdminKey : handleGenerateUserKey}
+                    disabled={isGeneratingKey}
+                    title="Regenerate new key"
+                    className="px-3 py-2 bg-white/10 hover:bg-white/15 text-neutral-200 hover:text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isGeneratingKey ? 'animate-spin' : ''}`} />
+                    <span>Regenerate</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleGenerateUserKey}
+                  disabled={isGeneratingKey}
+                  className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-indigo-600 hover:from-emerald-600 hover:to-indigo-700 text-white rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{isGeneratingKey ? 'Generating Key...' : 'Generate API Key'}</span>
+                </button>
+              )}
             </div>
           </div>
 
           {/* Capabilities Grid */}
-          <div className="px-5 sm:px-6 py-2.5 bg-neutral-100/80 dark:bg-white/[0.02] border-b border-neutral-200/60 dark:border-white/5 flex flex-wrap items-center gap-3 text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
+          <div className="px-5 sm:px-6 py-2.5 bg-neutral-100/80 dark:bg-white/[0.02] border-b border-neutral-200/60 dark:border-white/5 flex flex-wrap items-center gap-2.5 text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
             <span className="font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1">
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              AI Granted Super Admin Permissions:
+              Granted AI Capabilities:
             </span>
             <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
               <Calendar className="w-3 h-3" /> See Schedule & Tasks
@@ -861,12 +818,16 @@ OPERATIONAL INSTRUCTIONS:
             <span className="px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 font-semibold flex items-center gap-1">
               <Trash2 className="w-3 h-3" /> Delete Tasks
             </span>
-            <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 font-semibold flex items-center gap-1">
-              <FolderPlus className="w-3 h-3" /> Create Projects
-            </span>
-            <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 font-semibold flex items-center gap-1">
-              <Building2 className="w-3 h-3" /> Create Workspace Plans
-            </span>
+            {isTargetSuperAdmin && (
+              <>
+                <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 font-semibold flex items-center gap-1">
+                  <FolderPlus className="w-3 h-3" /> Create Projects
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 font-semibold flex items-center gap-1">
+                  <Building2 className="w-3 h-3" /> Create Workspace Plans
+                </span>
+              </>
+            )}
           </div>
 
           {/* Tab Navigation */}
@@ -895,7 +856,7 @@ OPERATIONAL INSTRUCTIONS:
                 }`}
               >
                 <FileCode className="w-3.5 h-3.5" />
-                <span>Node.js Agent</span>
+                <span>Node.js / TS</span>
               </button>
 
               <button
@@ -947,7 +908,7 @@ OPERATIONAL INSTRUCTIONS:
                 }`}
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Live Super Admin Console</span>
+                <span>Live Testing Console</span>
               </button>
             </div>
           </div>
@@ -960,11 +921,11 @@ OPERATIONAL INSTRUCTIONS:
                   <div className="flex items-center gap-2 text-xs font-bold text-neutral-700 dark:text-neutral-300">
                     <Terminal className="w-4 h-4 text-indigo-500" />
                     <span>
-                      {activeTab === 'python' && 'Python Super Admin AI Controller Class'}
-                      {activeTab === 'javascript' && 'Node.js / TypeScript Super Admin AI Module'}
-                      {activeTab === 'curl' && 'Direct REST API cURL Commands with Super Admin Token'}
-                      {activeTab === 'custom_gpt' && 'OpenAPI 3.1.0 Actions Specification for ChatGPT & Gemini'}
-                      {activeTab === 'system_prompt' && 'AI System Prompt for Autonomous Second Super Admin'}
+                      {activeTab === 'python' && `Python SDK for ${targetName}`}
+                      {activeTab === 'javascript' && `Node.js / TS Module for ${targetName}`}
+                      {activeTab === 'curl' && `REST API cURL Commands (${targetEmail})`}
+                      {activeTab === 'custom_gpt' && `OpenAPI 3.1.0 Actions Specification for GPT & Gemini`}
+                      {activeTab === 'system_prompt' && `AI System Prompt for Autonomous Agent`}
                     </span>
                   </div>
 
@@ -972,10 +933,10 @@ OPERATIONAL INSTRUCTIONS:
                     type="button"
                     onClick={() => {
                       const codeToCopy = 
-                        activeTab === 'python' ? pythonSuperAdminCode :
-                        activeTab === 'javascript' ? jsSuperAdminCode :
-                        activeTab === 'curl' ? curlSuperAdminCode :
-                        activeTab === 'custom_gpt' ? customGptSuperAdminSchema : aiSystemPrompt;
+                        activeTab === 'python' ? pythonCode :
+                        activeTab === 'javascript' ? jsCode :
+                        activeTab === 'curl' ? curlCode :
+                        activeTab === 'custom_gpt' ? customGptSchema : systemPromptCode;
                       copyToClipboard(codeToCopy, activeTab);
                     }}
                     className="px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-white/10 dark:hover:bg-white/15 text-neutral-800 dark:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
@@ -997,33 +958,39 @@ OPERATIONAL INSTRUCTIONS:
                 {/* Code Block Container */}
                 <div className="relative rounded-2xl bg-neutral-950 border border-neutral-800 p-4 font-mono text-[11px] leading-relaxed text-emerald-400 overflow-x-auto max-h-[380px] select-all shadow-inner">
                   <pre>{
-                    activeTab === 'python' ? pythonSuperAdminCode :
-                    activeTab === 'javascript' ? jsSuperAdminCode :
-                    activeTab === 'curl' ? curlSuperAdminCode :
-                    activeTab === 'custom_gpt' ? customGptSuperAdminSchema : aiSystemPrompt
+                    activeTab === 'python' ? pythonCode :
+                    activeTab === 'javascript' ? jsCode :
+                    activeTab === 'curl' ? curlCode :
+                    activeTab === 'custom_gpt' ? customGptSchema : systemPromptCode
                   }</pre>
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-2.5 text-xs text-emerald-900 dark:text-emerald-200">
-                  <Crown className="w-4 h-4 shrink-0 mt-0.5 text-emerald-500" />
+                  <Sparkles className="w-4 h-4 shrink-0 mt-0.5 text-emerald-500" />
                   <div>
-                    <span className="font-bold block">Second Super Admin Authority:</span>
-                    <span>This integration code has full root capabilities over your Tasky system. It can autonomously read your schedule, create tasks, permanently delete completed/canceled tasks, and establish new project workspaces and organization plans.</span>
+                    <span className="font-bold block">
+                      {isTargetSuperAdmin ? 'Second Super Admin AI Authority:' : `Personal AI Key for ${targetName}:`}
+                    </span>
+                    <span>
+                      {isTargetSuperAdmin 
+                        ? 'This integration code has full root capabilities over your Tasky system. It can autonomously read your schedule, create tasks, permanently delete completed/canceled tasks, and establish new project workspaces and organization plans.'
+                        : `This key allows ${targetName}'s AI to read their schedule, create tasks, update statuses, and track project deadlines in real time.`}
+                    </span>
                   </div>
                 </div>
               </div>
             ) : (
-              /* Live Test Playground for Second Super Admin */
+              /* Live Test Playground */
               <div className="space-y-4">
                 <div className="p-4 sm:p-5 rounded-2xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/80 dark:border-white/10 space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 flex items-center gap-2">
-                        <Crown className="w-4 h-4 text-amber-500" />
-                        Execute Super Admin Actions as Second AI
+                        {isTargetSuperAdmin ? <Crown className="w-4 h-4 text-amber-500" /> : <Bot className="w-4 h-4 text-emerald-500" />}
+                        Execute AI Action for {targetName}
                       </h3>
                       <p className="text-[11px] text-neutral-500 mt-0.5">
-                        Test live data mutations in your active workspace using your AI Master Key
+                        Test live data mutations in your active workspace using this AI Key
                       </p>
                     </div>
 
@@ -1033,13 +1000,17 @@ OPERATIONAL INSTRUCTIONS:
                         onChange={(e) => setPlaygroundAction(e.target.value as any)}
                         className="px-3 py-1.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 rounded-xl text-xs font-bold focus:outline-none focus:border-indigo-500 text-neutral-800 dark:text-white shadow-sm"
                       >
-                        <option value="get_schedule">📅 1. See Full Schedule & Tasks</option>
-                        <option value="create_task">➕ 2. Create Task as Super Admin</option>
-                        <option value="delete_task">🗑️ 3. Delete Task (Full Authority)</option>
+                        <option value="get_schedule">📅 1. See Schedule & Tasks</option>
+                        <option value="create_task">➕ 2. Create Task</option>
+                        <option value="delete_task">🗑️ 3. Delete Task</option>
                         <option value="update_task_status">🔄 4. Update Task Status</option>
-                        <option value="create_project">🏗️ 5. Create New Project</option>
-                        <option value="create_plan">🏢 6. Create Workspace Plan</option>
-                        <option value="get_audit">👥 7. Full Workspace Audit</option>
+                        {isTargetSuperAdmin && (
+                          <>
+                            <option value="create_project">🏗️ 5. Create Project</option>
+                            <option value="create_plan">🏢 6. Create Workspace Plan</option>
+                            <option value="get_audit">👥 7. Full Workspace Audit</option>
+                          </>
+                        )}
                       </select>
 
                       <button
@@ -1067,7 +1038,7 @@ OPERATIONAL INSTRUCTIONS:
                           type="text"
                           value={testTaskTitle}
                           onChange={(e) => setTestTaskTitle(e.target.value)}
-                          placeholder="e.g. Schedule Executive Alignment"
+                          placeholder="e.g. Finish quarterly project proposal"
                           className="w-full px-3 py-1.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 rounded-xl text-xs text-neutral-800 dark:text-white focus:outline-none focus:border-indigo-500"
                         />
                       </div>
@@ -1098,7 +1069,7 @@ OPERATIONAL INSTRUCTIONS:
 
                   {playgroundAction === 'delete_task' && (
                     <div className="pt-3 border-t border-neutral-200/60 dark:border-white/5">
-                      <label className="text-[10px] font-bold text-neutral-500 uppercase block mb-1">Select Task to Delete with Super Admin Authority</label>
+                      <label className="text-[10px] font-bold text-neutral-500 uppercase block mb-1">Select Task to Delete</label>
                       <select
                         value={testDeleteTaskId}
                         onChange={(e) => setTestDeleteTaskId(e.target.value)}
@@ -1199,7 +1170,7 @@ OPERATIONAL INSTRUCTIONS:
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-                      Live Second Super Admin Response
+                      Live AI Execution Response
                     </span>
                     {playgroundOutput && (
                       <button
@@ -1216,7 +1187,7 @@ OPERATIONAL INSTRUCTIONS:
                       <pre>{playgroundOutput}</pre>
                     ) : (
                       <span className="text-neutral-500 italic">
-                        Select an action above and click "Run Action" to test schedule reading, task creation, deletion, project creation, or plan setup...
+                        Select an action above and click "Run Action" to test schedule reading, task creation, deletion, or status updates...
                       </span>
                     )}
                   </div>
@@ -1229,7 +1200,11 @@ OPERATIONAL INSTRUCTIONS:
           <div className="p-4 border-t border-neutral-200/80 dark:border-white/10 flex items-center justify-between shrink-0 bg-neutral-50/50 dark:bg-white/[0.02]">
             <div className="flex items-center gap-2 text-[11px] text-neutral-500">
               <ShieldCheck className="w-4 h-4 text-emerald-500" />
-              <span>Full Level-2 Root Super Admin Authorization Active</span>
+              <span>
+                {isTargetSuperAdmin 
+                  ? 'Full Level-2 Root Super Admin Authorization Active' 
+                  : `Personal AI Authorization for ${targetName} (${targetRank}) Active`}
+              </span>
             </div>
 
             <button
@@ -1245,4 +1220,3 @@ OPERATIONAL INSTRUCTIONS:
     </AnimatePresence>
   );
 };
-
