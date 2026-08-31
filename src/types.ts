@@ -119,6 +119,8 @@ export interface TeamMember {
   projectIds?: string[]; // Joined project IDs
   email?: string;
   password?: string;
+  apiKey?: string; // Personalized AI API Key (issued by Admin or auto-provisioned)
+  apiKeyCreatedAt?: string; // ISO string
   isImpersonated?: boolean;
   joinedAt?: string;
 }
