@@ -1,12 +1,15 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore instance using firestoreDatabaseId from config
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Initialize Firestore instance using firestoreDatabaseId from config with long polling auto-detection and resilient connection settings
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+  ignoreUndefinedProperties: true
+}, firebaseConfig.firestoreDatabaseId);
 
 // Initialize standard Auth instance
 export const auth = getAuth(app);
