@@ -635,9 +635,15 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         localStorage.removeItem('tasky_impersonated_org_id');
 
         setSyncStatus('synced');
-      } catch (error) {
-        console.error("Error during database cleanup and init:", error);
-        setSyncStatus('error');
+      } catch (error: any) {
+        const isUnavailable = error?.code === 'unavailable' || error?.message?.includes('unavailable');
+        if (isUnavailable) {
+          console.warn("Database initialization deferred - operating in offline/cached mode.");
+          setSyncStatus('offline');
+        } else {
+          console.error("Error during database cleanup and init:", error);
+          setSyncStatus('error');
+        }
       }
     };
     initializeAndCleanupDatabase();
