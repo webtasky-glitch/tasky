@@ -254,22 +254,20 @@ export const Sidebar: React.FC<{ onClose?: () => void; isMobile?: boolean }> = (
           <span>v1.0.0</span>
         </div>
 
-        {/* AI & API Connector Button (Admin Only) */}
-        {isAdmin && (
-          <button
-            onClick={() => setIsAiModalOpen(true)}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-500/15 to-indigo-500/15 border border-emerald-500/30 text-xs font-bold text-emerald-800 dark:text-emerald-300 hover:from-emerald-500/25 hover:to-indigo-500/25 transition-all cursor-pointer shadow-sm"
-          >
-            <span className="flex items-center gap-2">
-              <Bot className="w-3.5 h-3.5 text-emerald-500" />
-              <span>AI & API Access</span>
-            </span>
-            <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-emerald-500 text-white font-extrabold flex items-center gap-0.5">
-              <Sparkles className="w-2.5 h-2.5" />
-              ADMIN
-            </span>
-          </button>
-        )}
+        {/* AI & API Connector Button (Accessible to All Users) */}
+        <button
+          onClick={() => setIsAiModalOpen(true)}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-500/15 to-indigo-500/15 border border-emerald-500/30 text-xs font-bold text-emerald-800 dark:text-emerald-300 hover:from-emerald-500/25 hover:to-indigo-500/25 transition-all cursor-pointer shadow-sm"
+        >
+          <span className="flex items-center gap-2">
+            <Bot className="w-3.5 h-3.5 text-emerald-500" />
+            <span>AI & API Access</span>
+          </span>
+          <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-emerald-500 text-white font-extrabold flex items-center gap-0.5">
+            <Sparkles className="w-2.5 h-2.5" />
+            {isAdmin ? 'ADMIN' : 'API KEY'}
+          </span>
+        </button>
 
         {/* Android & PWA App Button */}
         <button
