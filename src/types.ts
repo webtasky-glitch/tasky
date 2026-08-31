@@ -53,6 +53,9 @@ export interface Task {
   createdBy?: string; // TeamMember ID of creator
   orgId?: string; // Organization ID
   projectId?: string; // Project ID
+  focusBlock?: 'MorningFocus' | 'AfternoonDeep' | 'QuickAdmin' | 'EveningReview';
+  estimatedHours?: number; // Estimated hours of effort for workload calculation
+  dependsOnTaskId?: string; // Task ID this task is blocked by or depends on
 }
 
 export interface Project {
