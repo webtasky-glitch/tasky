@@ -28,7 +28,10 @@ import {
   CheckSquare,
   ShieldCheck,
   Building2,
-  Repeat
+  Repeat,
+  Brain,
+  Zap,
+  ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -125,6 +128,19 @@ export const DashboardView: React.FC = () => {
   const [newAttachments, setNewAttachments] = useState<Attachment[]>([]);
   const [showCompletedSection, setShowCompletedSection] = useState(false);
 
+  // Quick Task FAB Modal states
+  const [showQuickModal, setShowQuickModal] = useState(false);
+  const [quickTitle, setQuickTitle] = useState('');
+  const [quickDesc, setQuickDesc] = useState('');
+  const [quickDueDate, setQuickDueDate] = useState(() => getTodayString());
+  const [quickPriority, setQuickPriority] = useState<TaskPriority>('Medium');
+  const [quickCategoryId, setQuickCategoryId] = useState('');
+  const [quickSubjectName, setQuickSubjectName] = useState('');
+  const [quickAssignees, setQuickAssignees] = useState<string[]>([]);
+  const [quickFocusBlock, setQuickFocusBlock] = useState<'MorningFocus' | 'AfternoonDeep' | 'QuickAdmin' | 'EveningReview'>('MorningFocus');
+  const [quickEstimatedHours, setQuickEstimatedHours] = useState('1.5');
+  const [isSubmittingQuick, setIsSubmittingQuick] = useState(false);
+
   // Create Category states
   const [showCatForm, setShowCatForm] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -207,6 +223,99 @@ export const DashboardView: React.FC = () => {
     addCategory(newCatName.trim(), newCatColor, newCatType);
     setNewCatName('');
     setShowCatForm(false);
+  };
+
+  // Close Quick Task Modal on Escape key
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showQuickModal) {
+        setShowQuickModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showQuickModal]);
+
+  const setQuickDateOffset = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    setQuickDueDate(`${y}-${m}-${day}`);
+  };
+
+  const handleQuickCreateTask = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!quickTitle.trim() || isSubmittingQuick) return;
+
+    setIsSubmittingQuick(true);
+    try {
+      let categoryId = '';
+      const cleanSubject = quickSubjectName.trim();
+      if (cleanSubject) {
+        const existingCat = categories.find(
+          (c: any) => c.name.toLowerCase() === cleanSubject.toLowerCase()
+        );
+        if (existingCat) {
+          categoryId = existingCat.id;
+        } else {
+          try {
+            categoryId = await addCategory(cleanSubject, '#6366f1', 'Subject');
+          } catch (err) {
+            console.error("Failed to add quick subject category:", err);
+            categoryId = categories[0]?.id || '';
+          }
+        }
+      } else if (quickCategoryId) {
+        categoryId = quickCategoryId;
+      } else {
+        categoryId = categories[0]?.id || '';
+      }
+
+      await addTask({
+        title: quickTitle.trim(),
+        description: quickDesc.trim(),
+        dueDate: quickDueDate || getTodayString(),
+        priority: quickPriority,
+        categoryId,
+        status: 'Todo',
+        recurring: 'None',
+        assignedTo: quickAssignees[0] || currentUserProfile?.id,
+        assignedToIds: quickAssignees.length > 0 ? quickAssignees : (currentUserProfile?.id ? [currentUserProfile.id] : []),
+        createdBy: currentUserProfile?.id,
+        orgId: currentUserProfile?.orgId || undefined,
+        focusBlock: quickFocusBlock,
+        estimatedHours: parseFloat(quickEstimatedHours) || 1.5,
+        attachments: []
+      });
+
+      // Reset Quick Form
+      setQuickTitle('');
+      setQuickDesc('');
+      setQuickSubjectName('');
+      setQuickDueDate(getTodayString());
+      setQuickPriority('Medium');
+      setQuickAssignees([]);
+      setQuickFocusBlock('MorningFocus');
+      setQuickEstimatedHours('1.5');
+      setShowQuickModal(false);
+    } catch (err) {
+      console.error("Failed to quick create task:", err);
+    } finally {
+      setIsSubmittingQuick(false);
+    }
+  };
+
+  const handleExpandToFullForm = () => {
+    setNewTitle(quickTitle);
+    setNewDesc(quickDesc);
+    setNewSubjectName(quickSubjectName);
+    setNewDueDate(quickDueDate);
+    setNewPriority(quickPriority);
+    setNewAssignees(quickAssignees);
+    setShowQuickModal(false);
+    setShowCreateForm(true);
   };
 
   // Filter & Sort core logic
@@ -471,7 +580,9 @@ export const DashboardView: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 glass-panel rounded-[32px] p-6 sm:p-8 space-y-6 overflow-y-auto shadow-xl">
+    <div className="relative flex-1 flex flex-col h-full min-h-0 overflow-hidden">
+      {/* Scrollable Dashboard Workspace Content */}
+      <div className="flex-1 glass-panel rounded-[32px] p-6 sm:p-8 space-y-6 overflow-y-auto shadow-xl">
       
       {/* Top Banner & Quick Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -940,6 +1051,326 @@ export const DashboardView: React.FC = () => {
           </div>
         )}
       </div>
+      </div>
+
+      {/* Persistent Floating Action Button (FAB) */}
+      <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 md:bottom-8 md:right-8 z-30 pointer-events-auto">
+        <motion.button
+          id="dashboard-floating-action-button"
+          type="button"
+          onClick={() => setShowQuickModal(true)}
+          whileHover={{ scale: 1.05, y: -2 }}
+          whileTap={{ scale: 0.95 }}
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+          className="flex items-center gap-2.5 pl-3.5 pr-4 sm:pl-4 sm:pr-5 py-3 sm:py-3.5 rounded-full bg-gradient-to-r from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-semibold text-xs sm:text-sm shadow-2xl shadow-indigo-600/40 border border-white/25 backdrop-blur-md cursor-pointer transition-all group focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 dark:focus:ring-offset-neutral-900"
+          title="Quick Create Task (without leaving workspace)"
+          aria-label="Quick Create Task"
+        >
+          <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center transition-transform group-hover:rotate-90 duration-300">
+            <Plus className="w-3.5 h-3.5 text-white" />
+          </div>
+          <span className="font-semibold tracking-tight">New Task</span>
+          <span className="hidden sm:inline-flex items-center text-[10px] uppercase font-mono font-bold bg-white/20 text-white/90 px-1.5 py-0.5 rounded-md">
+            Quick
+          </span>
+        </motion.button>
+      </div>
+
+      {/* Quick Task Creation Modal */}
+      <AnimatePresence>
+        {showQuickModal && (
+          <div 
+            id="quick-task-modal-backdrop"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowQuickModal(false);
+              }
+            }}
+          >
+            <motion.div
+              id="quick-task-modal-card"
+              initial={{ scale: 0.95, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 15 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="glass-panel w-full max-w-lg shadow-2xl rounded-3xl border border-white/40 dark:border-white/10 bg-white/95 dark:bg-neutral-900/95 overflow-hidden flex flex-col backdrop-blur-xl"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200/60 dark:border-white/10">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                      <span>Quick Create Task</span>
+                      <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border border-indigo-500/20">
+                        In-Place
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-neutral-500">
+                      Add to your workspace without losing your place
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  id="close-quick-task-modal-button"
+                  type="button"
+                  onClick={() => setShowQuickModal(false)}
+                  className="p-1.5 rounded-xl text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Close (Esc)"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Form Body */}
+              <form onSubmit={handleQuickCreateTask} className="p-5 space-y-4">
+                {/* Title */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
+                    <span>Task Title <span className="text-rose-500">*</span></span>
+                    <span className="text-[10px] text-neutral-400 font-normal">Press Enter to save</span>
+                  </label>
+                  <input
+                    id="quick-task-title-input"
+                    type="text"
+                    required
+                    autoFocus
+                    placeholder="e.g., Finalize project report or Review pull request"
+                    value={quickTitle}
+                    onChange={(e) => setQuickTitle(e.target.value)}
+                    className="w-full text-sm font-medium glass-input rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 text-neutral-900 dark:text-white placeholder:text-neutral-400"
+                  />
+                </div>
+
+                {/* Subject / Category & Due Date Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Category */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                      Category / Subject
+                    </label>
+                    <input
+                      id="quick-task-category-input"
+                      type="text"
+                      placeholder="e.g. Work, Admin, Design"
+                      value={quickSubjectName}
+                      onChange={(e) => setQuickSubjectName(e.target.value)}
+                      list="quick-category-suggestions"
+                      className="w-full text-xs font-medium glass-input rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 text-neutral-900 dark:text-white placeholder:text-neutral-400"
+                    />
+                    <datalist id="quick-category-suggestions">
+                      {categories.map((c: any) => (
+                        <option key={c.id} value={c.name} />
+                      ))}
+                    </datalist>
+                  </div>
+
+                  {/* Due Date & Quick Offset Buttons */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                        Due Date
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setQuickDateOffset(0)}
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
+                            quickDueDate === getTodayString()
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200'
+                          }`}
+                        >
+                          Today
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setQuickDateOffset(1)}
+                          className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 transition-colors cursor-pointer"
+                        >
+                          +1d
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setQuickDateOffset(7)}
+                          className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 transition-colors cursor-pointer"
+                        >
+                          +1w
+                        </button>
+                      </div>
+                    </div>
+                    <input
+                      id="quick-task-due-date-input"
+                      type="date"
+                      required
+                      value={quickDueDate}
+                      onChange={(e) => setQuickDueDate(e.target.value)}
+                      className="w-full text-xs font-mono font-medium glass-input rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 text-neutral-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Priority & Focus Energy Slot */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Priority Selector */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                      Priority Level
+                    </label>
+                    <div className="grid grid-cols-4 gap-1">
+                      {(['Low', 'Medium', 'High', 'Urgent'] as TaskPriority[]).map((p) => {
+                        const isSelected = quickPriority === p;
+                        const colors = {
+                          Low: isSelected ? 'bg-neutral-500 text-white' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400',
+                          Medium: isSelected ? 'bg-amber-500 text-white' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400',
+                          High: isSelected ? 'bg-orange-500 text-white' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400',
+                          Urgent: isSelected ? 'bg-rose-500 text-white' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400',
+                        };
+                        return (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => setQuickPriority(p)}
+                            className={`py-1.5 text-[11px] font-bold rounded-lg transition-all cursor-pointer text-center ${colors[p]} ${
+                              isSelected ? 'shadow-xs scale-[1.02]' : 'hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Energy / Focus Slot */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
+                      <Brain className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>Focus Slot</span>
+                    </label>
+                    <select
+                      id="quick-task-focus-slot-select"
+                      value={quickFocusBlock}
+                      onChange={(e) => setQuickFocusBlock(e.target.value as any)}
+                      className="w-full text-xs font-medium glass-input rounded-xl px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 text-neutral-900 dark:text-white [&>option]:bg-white dark:[&>option]:bg-neutral-900"
+                    >
+                      <option value="MorningFocus">🌅 Morning Focus (Peak)</option>
+                      <option value="AfternoonDeep">⚡ Afternoon Deep Work</option>
+                      <option value="QuickAdmin">☕ Quick Admin & Comms</option>
+                      <option value="EveningReview">🌙 Evening Review</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Assignees & Estimated Hours */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <Users className="w-3 h-3 text-indigo-500" />
+                        Assign To
+                      </span>
+                      {quickAssignees.length > 0 && (
+                        <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">
+                          {quickAssignees.length} selected
+                        </span>
+                      )}
+                    </label>
+                    <AssigneeMultiSelector
+                      selectedIds={quickAssignees}
+                      onChange={setQuickAssignees}
+                      assignableMembers={assignableMembers}
+                      currentUserId={currentUserProfile?.id}
+                      placeholder="Assign plan members (optional)..."
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-neutral-400" />
+                      <span>Est. Hours</span>
+                    </label>
+                    <input
+                      id="quick-task-hours-input"
+                      type="number"
+                      step="0.5"
+                      min="0.5"
+                      max="24"
+                      value={quickEstimatedHours}
+                      onChange={(e) => setQuickEstimatedHours(e.target.value)}
+                      className="w-full text-xs font-mono font-medium glass-input rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 text-neutral-900 dark:text-white"
+                      placeholder="1.5"
+                    />
+                  </div>
+                </div>
+
+                {/* Notes / Description (Optional) */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                    Short Description / Notes (Optional)
+                  </label>
+                  <input
+                    id="quick-task-desc-input"
+                    type="text"
+                    placeholder="Brief notes, link, or context..."
+                    value={quickDesc}
+                    onChange={(e) => setQuickDesc(e.target.value)}
+                    className="w-full text-xs font-medium glass-input rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 text-neutral-900 dark:text-white placeholder:text-neutral-400"
+                  />
+                </div>
+
+                {/* Modal Footer Controls */}
+                <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-3 pt-3 border-t border-neutral-200/60 dark:border-white/10">
+                  <button
+                    id="quick-task-expand-button"
+                    type="button"
+                    onClick={handleExpandToFullForm}
+                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <span>Open full editor with attachments</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <button
+                      id="quick-task-cancel-button"
+                      type="button"
+                      onClick={() => setShowQuickModal(false)}
+                      className="px-3.5 py-2 text-xs font-bold text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      id="quick-task-submit-button"
+                      type="submit"
+                      disabled={!quickTitle.trim() || isSubmittingQuick}
+                      className="flex-1 sm:flex-initial px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      {isSubmittingQuick ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <span>Creating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Create Task</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Selected Task Detail Modal */}
       <AnimatePresence>
