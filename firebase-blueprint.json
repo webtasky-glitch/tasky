@@ -1,0 +1,162 @@
+{
+  "collections": {
+    "tasks": {
+      "fields": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "priority": { "type": "string" },
+        "status": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "checklist": { "type": "array" },
+        "attachments": { "type": "array" },
+        "comments": { "type": "array" },
+        "recurring": { "type": "string" },
+        "isPinned": { "type": "boolean" },
+        "completedAt": { "type": "string", "optional": true },
+        "assignedTo": { "type": "string", "optional": true },
+        "assignedToIds": { "type": "array", "optional": true }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "categories": {
+      "fields": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "color": { "type": "string" },
+        "type": { "type": "string" }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "habits": {
+      "fields": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "frequency": { "type": "string" },
+        "streak": { "type": "number" },
+        "completedDates": { "type": "array" },
+        "createdAt": { "type": "string" }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "team": {
+      "fields": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "avatar": { "type": "string" },
+        "rank": { "type": "string" },
+        "orgId": { "type": "string", "optional": true },
+        "email": { "type": "string", "optional": true },
+        "password": { "type": "string", "optional": true },
+        "familyRole": { "type": "string", "optional": true }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "privacyRecords": {
+      "fields": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "consents": { "type": "object" },
+        "updatedAt": { "type": "string" }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "auditLogs": {
+      "fields": {
+        "id": { "type": "string" },
+        "actorId": { "type": "string" },
+        "actorEmail": { "type": "string", "optional": true },
+        "action": { "type": "string" },
+        "resourceType": { "type": "string" },
+        "resourceId": { "type": "string", "optional": true },
+        "timestamp": { "type": "string" },
+        "details": { "type": "string", "optional": true }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "securityIncidents": {
+      "fields": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "severity": { "type": "string" },
+        "detectedAt": { "type": "string" },
+        "status": { "type": "string" },
+        "affectedDataTypes": { "type": "array" },
+        "affectedUsersCount": { "type": "number" },
+        "dpaNotifiedWithin72h": { "type": "boolean" },
+        "summary": { "type": "string" }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "organizations": {
+      "fields": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "messages": {
+      "fields": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderAvatar": { "type": "string" },
+        "senderEmail": { "type": "string" },
+        "orgId": { "type": "string", "optional": true },
+        "receiverId": { "type": "string", "optional": true },
+        "isSupport": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "aiSupportQA": {
+      "fields": {
+        "id": { "type": "string" },
+        "question": { "type": "string" },
+        "answer": { "type": "string" },
+        "keywords": { "type": "array", "optional": true },
+        "category": { "type": "string", "optional": true },
+        "usageCount": { "type": "number", "optional": true },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string", "optional": true },
+        "createdBy": { "type": "string", "optional": true }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
+    }
+  }
+}
