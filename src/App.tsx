@@ -32,6 +32,7 @@ import {
   FolderKanban
 } from 'lucide-react';
 import { useTranslation } from './translations';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 const adjustHexColor = (hex: string, percent: number): string => {
   try {
@@ -339,6 +340,7 @@ export default function App() {
   return (
     <TaskyProvider>
       <AppContent />
+      <SpeedInsights />
     </TaskyProvider>
   );
 }
