@@ -1,9 +1,0 @@
-{
-	"appId": "com.tasky.app",
-	"appName": "Tasky",
-	"webDir": "dist",
-	"bundledWebRuntime": false,
-	"server": {
-		"androidScheme": "https"
-	}
-}
