@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { TaskyProvider, useTasky } from './TaskyContext';
 import { Sidebar } from './components/Sidebar';
 import { DashboardView } from './components/DashboardView';
@@ -339,7 +340,7 @@ export default function App() {
   return (
     <TaskyProvider>
       <AppContent />
+      <Analytics />
     </TaskyProvider>
   );
 }
-
