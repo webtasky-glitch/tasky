@@ -197,7 +197,7 @@ const AppContent: React.FC = () => {
               />
             ) : (
               <img 
-                src="https://i.postimg.cc/13414BQq/app-icon.jpg" 
+                src="https://i.postimg.cc/ZKPq2Nyd/file-00000000c52481f4801a2d88eaae2b34.png" 
                 alt="Tasky Logo" 
                 className="w-7 h-7 object-cover rounded-lg shadow-sm"
                 referrerPolicy="no-referrer"
