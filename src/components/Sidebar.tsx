@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useTasky } from '../TaskyContext';
 import { useTranslation } from '../translations';
 import { isTaskForUser } from '../utils/taskFilter';
-const DEFAULT_APP_LOGO = 'https://i.postimg.cc/13414BQq/app-icon.jpg';
+const DEFAULT_APP_LOGO = 'https://i.postimg.cc/ZKPq2Nyd/file-00000000c52481f4801a2d88eaae2b34.png';
 import { 
   CheckSquare, 
   Calendar, 
