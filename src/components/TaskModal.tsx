@@ -926,8 +926,12 @@ startxref
                               className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-indigo-50/80 dark:bg-indigo-950/50 border border-indigo-200/60 dark:border-indigo-900/60 text-indigo-900 dark:text-indigo-200 text-[11px] font-medium"
                               title={`${tm.name} (${tm.role || tm.rank || 'Member'})`}
                             >
-                              <span className="w-4 h-4 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-[8px]">
-                                {tm.avatar || tm.name.slice(0, 2).toUpperCase()}
+                              <span className="w-4 h-4 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-[8px] overflow-hidden">
+                                {tm.avatar && (tm.avatar.startsWith('data:image/') || tm.avatar.startsWith('http') || tm.avatar.startsWith('/')) ? (
+                                  <img src={tm.avatar} alt={tm.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                ) : (
+                                  tm.avatar || tm.name.slice(0, 2).toUpperCase()
+                                )}
                               </span>
                               <span className="truncate max-w-[120px]">{tm.name}</span>
                               {tm.rank && (
@@ -1119,8 +1123,12 @@ startxref
                   <div key={comment.id} className="space-y-1 text-xs">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
-                        <div className="w-5 h-5 rounded-full bg-white/20 dark:bg-white/10 border border-white/20 dark:border-white/5 font-bold flex items-center justify-center text-[9px] text-neutral-600 dark:text-neutral-400">
-                          {comment.authorAvatar}
+                        <div className="w-5 h-5 rounded-full bg-white/20 dark:bg-white/10 border border-white/20 dark:border-white/5 font-bold flex items-center justify-center text-[9px] text-neutral-600 dark:text-neutral-400 overflow-hidden">
+                          {comment.authorAvatar && (comment.authorAvatar.startsWith('data:image/') || comment.authorAvatar.startsWith('http') || comment.authorAvatar.startsWith('/')) ? (
+                            <img src={comment.authorAvatar} alt={comment.authorName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            comment.authorAvatar || (comment.authorName ? comment.authorName.slice(0, 2).toUpperCase() : 'U')
+                          )}
                         </div>
                         <span className="font-semibold text-neutral-700 dark:text-neutral-200">
                           {comment.authorName}
