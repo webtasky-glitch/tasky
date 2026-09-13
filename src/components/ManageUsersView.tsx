@@ -315,8 +315,12 @@ export const ManageUsersView: React.FC<{ onSwitchToAdd?: () => void }> = ({ onSw
                   className="p-4 glass-card rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-neutral-200/40 dark:border-white/5 hover:border-neutral-300 dark:hover:border-white/10 transition-all shadow-sm"
                 >
                   <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold flex items-center justify-center text-sm shrink-0 shadow-md">
-                      {member.avatar || member.name?.slice(0, 2).toUpperCase() || 'U'}
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold flex items-center justify-center text-sm shrink-0 shadow-md overflow-hidden">
+                      {member.avatar && (member.avatar.startsWith('data:image/') || member.avatar.startsWith('http') || member.avatar.startsWith('/')) ? (
+                        <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        member.avatar || member.name?.slice(0, 2).toUpperCase() || 'U'
+                      )}
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
