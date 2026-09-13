@@ -317,8 +317,12 @@ export const ChatView: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-center gap-1.5 font-bold min-w-0">
-                      <div className="w-5 h-5 rounded-full bg-white/20 dark:bg-white/15 text-[9px] flex items-center justify-center shrink-0">
-                        {tm.avatar}
+                      <div className="w-5 h-5 rounded-full bg-white/20 dark:bg-white/15 text-[9px] flex items-center justify-center shrink-0 overflow-hidden">
+                        {tm.avatar && (tm.avatar.startsWith('data:image/') || tm.avatar.startsWith('http') || tm.avatar.startsWith('/')) ? (
+                          <img src={tm.avatar} alt={tm.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          tm.avatar || (tm.name ? tm.name.charAt(0).toUpperCase() : 'U')
+                        )}
                       </div>
                       <span className="truncate">{tm.name}</span>
                     </div>
@@ -335,8 +339,12 @@ export const ChatView: React.FC = () => {
 
         {/* User Badge Footer */}
         <div className="p-4 border-t border-neutral-200/20 dark:border-white/5 flex items-center gap-2.5 bg-black/5 dark:bg-black/15">
-          <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold flex items-center justify-center border border-indigo-200/20 text-xs shrink-0">
-            {currentUserProfile?.avatar || '??'}
+          <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold flex items-center justify-center border border-indigo-200/20 text-xs shrink-0 overflow-hidden">
+            {currentUserProfile?.avatar && (currentUserProfile.avatar.startsWith('data:image/') || currentUserProfile.avatar.startsWith('http') || currentUserProfile.avatar.startsWith('/')) ? (
+              <img src={currentUserProfile.avatar} alt={currentUserProfile.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              currentUserProfile?.avatar || (currentUserProfile?.name ? currentUserProfile.name.charAt(0).toUpperCase() : '??')
+            )}
           </div>
           <div className="min-w-0">
             <h5 className="text-xs font-bold text-neutral-800 dark:text-neutral-200 truncate">
@@ -455,12 +463,18 @@ export const ChatView: React.FC = () => {
                       className={`group relative flex items-start gap-3 max-w-[85%] ${isMe ? 'ml-auto flex-row-reverse' : ''}`}
                     >
                       {/* Avatar */}
-                      <div className={`w-8 h-8 rounded-full font-bold flex items-center justify-center text-xs shrink-0 border border-white/20 ${
+                      <div className={`w-8 h-8 rounded-full font-bold flex items-center justify-center text-xs shrink-0 border border-white/20 overflow-hidden ${
                         isAI 
                           ? 'bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-md' 
                           : 'bg-neutral-200/60 dark:bg-white/10 text-neutral-700 dark:text-neutral-300'
                       }`}>
-                        {isAI ? <Bot className="w-4 h-4" /> : m.senderAvatar}
+                        {isAI ? (
+                          <Bot className="w-4 h-4" />
+                        ) : m.senderAvatar && (m.senderAvatar.startsWith('data:image/') || m.senderAvatar.startsWith('http') || m.senderAvatar.startsWith('/')) ? (
+                          <img src={m.senderAvatar} alt={m.senderName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          m.senderAvatar || (m.senderName ? m.senderName.slice(0, 2).toUpperCase() : 'U')
+                        )}
                       </div>
 
                       {/* Speech Bubble */}
