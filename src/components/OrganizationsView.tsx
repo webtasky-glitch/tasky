@@ -1033,8 +1033,12 @@ export const OrganizationsView: React.FC = () => {
                             <React.Fragment key={member.id}>
                               <div className="p-4 bg-white/20 dark:bg-white/5 border border-white/20 dark:border-white/5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div className="flex items-center gap-3 min-w-0">
-                                  <div className="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center shrink-0">
-                                    {member.avatar || member.name.charAt(0).toUpperCase()}
+                                  <div className="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center shrink-0 overflow-hidden">
+                                    {member.avatar && (member.avatar.startsWith('data:image/') || member.avatar.startsWith('http') || member.avatar.startsWith('/')) ? (
+                                      <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                    ) : (
+                                      member.avatar || (member.name ? member.name.charAt(0).toUpperCase() : 'U')
+                                    )}
                                   </div>
                                   <div className="min-w-0">
                                     <div className="flex items-center gap-2">
