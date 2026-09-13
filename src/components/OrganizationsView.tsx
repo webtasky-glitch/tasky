@@ -87,6 +87,52 @@ const extractDominantColor = (base64Str: string): Promise<string> => {
   });
 };
 
+const compressImage = (base64Str: string, maxWidth = 256, maxHeight = 256): Promise<string> => {
+  return new Promise((resolve) => {
+    if (base64Str.length < 50000) {
+      resolve(base64Str);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(base64Str);
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      const compressed = canvas.toDataURL('image/png');
+      resolve(compressed);
+    };
+    img.onerror = () => {
+      resolve(base64Str);
+    };
+    img.src = base64Str;
+  });
+};
+
 export const OrganizationsView: React.FC = () => {
   const { 
     organizations, 
@@ -192,8 +238,9 @@ export const OrganizationsView: React.FC = () => {
     }
     const reader = new FileReader();
     reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      if (base64) {
+      const rawBase64 = event.target?.result as string;
+      if (rawBase64) {
+        const base64 = await compressImage(rawBase64, 256, 256);
         setEditLogo(base64);
         if (!editingOrg && isManager && myOrg) {
           setEditingOrg(myOrg);
@@ -294,12 +341,12 @@ export const OrganizationsView: React.FC = () => {
 
       const updated: any = {
         ...editingMember,
-        name: editMemberName.trim(),
+        name: isAdmin ? editMemberName.trim() : (editingMember.name || '').trim(),
         role: editMemberRole.trim(),
         rank: targetOrgId ? (editingMember.rank || editMemberRank) : editMemberRank,
         orgRanks: updatedOrgRanks,
-        email: editMemberEmail.trim(),
-        password: editMemberPassword,
+        email: isAdmin ? editMemberEmail.trim() : (editingMember.email || '').trim(),
+        password: isAdmin ? editMemberPassword : (editingMember.password || ''),
       };
       
       if (editMemberOrgId) {
@@ -1726,6 +1773,15 @@ export const OrganizationsView: React.FC = () => {
               </button>
             </div>
 
+            {!isAdmin && (
+              <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-[11px] text-amber-700 dark:text-amber-300 flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
+                <span>
+                  <strong>Notice:</strong> Plan Managers are not authorized to edit other users' personal details (names, emails, passwords). Only system Administrators can modify these fields.
+                </span>
+              </div>
+            )}
+
             <form onSubmit={handleUpdateMemberSubmit} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-sans">
                 <div className="space-y-1">
@@ -1735,9 +1791,14 @@ export const OrganizationsView: React.FC = () => {
                   <input
                     type="text"
                     required
+                    disabled={!isAdmin}
                     value={editMemberName}
                     onChange={(e) => setEditMemberName(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl text-neutral-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all font-medium"
+                    className={`w-full px-4 py-2.5 border rounded-xl text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${
+                      !isAdmin
+                        ? 'bg-neutral-100 dark:bg-neutral-800/40 text-neutral-400 dark:text-neutral-500 border-neutral-200/50 dark:border-neutral-700/50 cursor-not-allowed'
+                        : 'bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-neutral-800 dark:text-white'
+                    }`}
                   />
                 </div>
 
@@ -1764,9 +1825,14 @@ export const OrganizationsView: React.FC = () => {
                   <input
                     type="email"
                     required
+                    disabled={!isAdmin}
                     value={editMemberEmail}
                     onChange={(e) => setEditMemberEmail(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl text-neutral-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all font-medium"
+                    className={`w-full px-4 py-2.5 border rounded-xl text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${
+                      !isAdmin
+                        ? 'bg-neutral-100 dark:bg-neutral-800/40 text-neutral-400 dark:text-neutral-500 border-neutral-200/50 dark:border-neutral-700/50 cursor-not-allowed'
+                        : 'bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-neutral-800 dark:text-white'
+                    }`}
                   />
                 </div>
 
@@ -1776,10 +1842,15 @@ export const OrganizationsView: React.FC = () => {
                   </label>
                   <input
                     type="text"
+                    disabled={!isAdmin}
                     value={editMemberPassword}
                     onChange={(e) => setEditMemberPassword(e.target.value)}
-                    placeholder="Set/Update password"
-                    className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl text-neutral-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all font-medium"
+                    placeholder={!isAdmin ? "Protected field" : "Set/Update password"}
+                    className={`w-full px-4 py-2.5 border rounded-xl text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${
+                      !isAdmin
+                        ? 'bg-neutral-100 dark:bg-neutral-800/40 text-neutral-400 dark:text-neutral-500 border-neutral-200/50 dark:border-neutral-700/50 cursor-not-allowed'
+                        : 'bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-neutral-800 dark:text-white'
+                    }`}
                   />
                 </div>
               </div>
