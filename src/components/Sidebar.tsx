@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTasky } from '../TaskyContext';
 import { useTranslation } from '../translations';
 import { isTaskForUser } from '../utils/taskFilter';
@@ -30,11 +30,59 @@ import {
   ShieldCheck, 
   ListTodo, 
   Clock,
-  X
+  X,
+  Camera,
+  Settings2
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { AndroidAppModal } from './AndroidAppModal';
 import { AiIntegrationsModal } from './AiIntegrationsModal';
+
+const compressImage = (base64Str: string, maxWidth = 256, maxHeight = 256): Promise<string> => {
+  return new Promise((resolve) => {
+    if (base64Str.length < 50000) {
+      resolve(base64Str);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(base64Str);
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      const compressed = canvas.toDataURL('image/png');
+      resolve(compressed);
+    };
+    img.onerror = () => {
+      resolve(base64Str);
+    };
+    img.src = base64Str;
+  });
+};
 
 export const Sidebar: React.FC<{ onClose?: () => void; isMobile?: boolean }> = ({ onClose, isMobile }) => {
   const { 
@@ -52,12 +100,76 @@ export const Sidebar: React.FC<{ onClose?: () => void; isMobile?: boolean }> = (
     currentUserProfile,
     userOrganizations,
     setIsWorkspaceSelectorOpen,
-    teamMembers
+    teamMembers,
+    updateTeamMember
   } = useTasky() as any;
 
   const { t } = useTranslation();
   const [isAndroidModalOpen, setIsAndroidModalOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  
+  // Profile settings states
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileEditName, setProfileEditName] = useState('');
+  const [profileEditAvatar, setProfileEditAvatar] = useState('');
+  const [profileError, setProfileError] = useState('');
+  const [isUploadingProfile, setIsUploadingProfile] = useState(false);
+
+  useEffect(() => {
+    if (isProfileModalOpen && currentUserProfile) {
+      setProfileEditName(currentUserProfile.name || '');
+      setProfileEditAvatar(currentUserProfile.avatar || '');
+      setProfileError('');
+    }
+  }, [isProfileModalOpen, currentUserProfile]);
+
+  const handleProfileFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setProfileError(language === 'el' ? 'Παρακαλώ επιλέξτε μια έγκυρη εικόνα' : 'Please select a valid image file');
+      return;
+    }
+    setIsUploadingProfile(true);
+    setProfileError('');
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const rawBase64 = event.target?.result as string;
+        if (rawBase64) {
+          const base64 = await compressImage(rawBase64, 256, 256);
+          setProfileEditAvatar(base64);
+        }
+        setIsUploadingProfile(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setProfileError(language === 'el' ? 'Σφάλμα επεξεργασίας εικόνας' : 'Failed to process image');
+      setIsUploadingProfile(false);
+    }
+  };
+
+  const handleSaveProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileEditName.trim()) {
+      setProfileError(language === 'el' ? 'Το όνομα δεν μπορεί να είναι κενό' : 'Name cannot be empty');
+      return;
+    }
+
+    try {
+      if (currentUserProfile) {
+        const updatedProfile = {
+          ...currentUserProfile,
+          name: profileEditName.trim(),
+          avatar: profileEditAvatar
+        };
+        await updateTeamMember(updatedProfile);
+        setIsProfileModalOpen(false);
+      }
+    } catch (err: any) {
+      setProfileError(err.message || 'Failed to update profile');
+    }
+  };
 
   const isGuest = localStorage.getItem('tasky_guest_mode') === 'true';
   const isSuperAdmin = currentUserProfile?.email?.toLowerCase().trim() === 'webtasky@gmail.com';
@@ -202,9 +314,25 @@ export const Sidebar: React.FC<{ onClose?: () => void; isMobile?: boolean }> = (
       <div className="px-4 py-3 border-b border-neutral-200/20 dark:border-white/5 shrink-0">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center border border-indigo-200/30 dark:border-indigo-900/30 shrink-0">
-              {initial}
-            </div>
+            <button 
+              onClick={() => setIsProfileModalOpen(true)}
+              title={language === 'el' ? 'Επεξεργασία προφίλ' : 'Edit profile'}
+              className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center border border-indigo-200/30 dark:border-indigo-900/30 shrink-0 overflow-hidden cursor-pointer hover:ring-2 hover:ring-indigo-500 transition-all relative group"
+            >
+              {currentUserProfile?.avatar && (currentUserProfile.avatar.startsWith('data:image/') || currentUserProfile.avatar.startsWith('http') || currentUserProfile.avatar.startsWith('/')) ? (
+                <img 
+                  src={currentUserProfile.avatar} 
+                  alt="Avatar" 
+                  className="w-full h-full object-cover" 
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                currentUserProfile?.avatar || initial
+              )}
+              <div className="absolute inset-0 bg-black/45 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Camera className="w-3 h-3 text-white" />
+              </div>
+            </button>
             <div className="min-w-0">
               <h4 className="text-xs font-bold text-neutral-800 dark:text-neutral-200 truncate leading-snug">
                 {profileName}
@@ -214,7 +342,14 @@ export const Sidebar: React.FC<{ onClose?: () => void; isMobile?: boolean }> = (
               </p>
             </div>
           </div>
-          <div className="flex gap-1 shrink-0">
+          <div className="flex gap-0.5 shrink-0">
+            <button
+              onClick={() => setIsProfileModalOpen(true)}
+              title={language === 'el' ? 'Ρυθμίσεις Προφίλ' : 'Profile Settings'}
+              className="p-1.5 rounded-lg hover:bg-neutral-200/50 dark:hover:bg-white/10 text-neutral-500 hover:text-indigo-500 dark:text-neutral-400 transition-colors cursor-pointer"
+            >
+              <Settings2 className="w-3.5 h-3.5" />
+            </button>
             <button
               onClick={handleLogout}
               title={t('sidebar.logout')}
@@ -343,6 +478,124 @@ export const Sidebar: React.FC<{ onClose?: () => void; isMobile?: boolean }> = (
         isOpen={isAiModalOpen}
         onClose={() => setIsAiModalOpen(false)}
       />
+
+      {isProfileModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs font-sans">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl overflow-hidden shadow-2xl"
+          >
+            <div className="p-6 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-neutral-800 dark:text-white">
+                  {language === 'el' ? 'Ρυθμίσεις Προφίλ' : 'Profile Settings'}
+                </h3>
+                <p className="text-[10px] text-neutral-400 mt-0.5">
+                  {language === 'el' ? 'Ενημερώστε την εικόνα προφίλ και το όνομά σας' : 'Update your avatar picture and display name'}
+                </p>
+              </div>
+              <button 
+                onClick={() => setIsProfileModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 dark:text-neutral-500 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfileSubmit} className="p-6 space-y-4">
+              {profileError && (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-[11px] text-rose-500 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{profileError}</span>
+                </div>
+              )}
+
+              {/* Avatar Selector */}
+              <div className="flex flex-col items-center gap-3">
+                <div className="relative group w-20 h-20 rounded-full bg-indigo-50 dark:bg-indigo-950/40 border-2 border-indigo-200 dark:border-indigo-900 flex items-center justify-center text-xl font-bold text-indigo-600 dark:text-indigo-400 overflow-hidden shadow-md">
+                  {profileEditAvatar ? (
+                    <img 
+                      src={profileEditAvatar} 
+                      alt="Avatar preview" 
+                      className="w-full h-full object-cover" 
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    profileEditName ? profileEditName.slice(0, 2).toUpperCase() : initial
+                  )}
+                  {isUploadingProfile && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById('profile-avatar-input')?.click()}
+                    disabled={isUploadingProfile}
+                    className="px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 rounded-xl text-[11px] font-bold text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    {language === 'el' ? 'Αλλαγή Εικόνας' : 'Change Image'}
+                  </button>
+                  {profileEditAvatar && (
+                    <button
+                      type="button"
+                      onClick={() => setProfileEditAvatar('')}
+                      className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 rounded-xl text-[11px] font-bold text-rose-600 dark:text-rose-400 transition-colors cursor-pointer"
+                    >
+                      {language === 'el' ? 'Αφαίρεση' : 'Remove'}
+                    </button>
+                  )}
+                </div>
+                <input 
+                  type="file" 
+                  id="profile-avatar-input" 
+                  className="hidden" 
+                  accept="image/*" 
+                  onChange={handleProfileFileChange}
+                />
+              </div>
+
+              {/* Display Name Input */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">
+                  {language === 'el' ? 'Ονοματεπώνυμο' : 'Full Name'}
+                </label>
+                <input 
+                  type="text" 
+                  required
+                  value={profileEditName}
+                  onChange={(e) => setProfileEditName(e.target.value)}
+                  placeholder={language === 'el' ? 'Εισάγετε όνομα...' : 'Enter your name...'}
+                  className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl text-neutral-800 dark:text-white text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+                />
+              </div>
+
+              {/* Footer Actions */}
+              <div className="pt-2 flex justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800">
+                <button
+                  type="button"
+                  onClick={() => setIsProfileModalOpen(false)}
+                  className="px-4 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  {language === 'el' ? 'Ακύρωση' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUploadingProfile}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/10 transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  {language === 'el' ? 'Αποθήκευση' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </aside>
   );
 };
