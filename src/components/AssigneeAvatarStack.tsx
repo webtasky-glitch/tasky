@@ -56,9 +56,13 @@ export const AssigneeAvatarStack: React.FC<AssigneeAvatarStackProps> = ({
           <div
             key={member.id || idx}
             title={`${member.name} (${member.role || member.rank || 'Member'})`}
-            className={`${sizeClasses} rounded-full bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white font-bold flex items-center justify-center ring-2 ring-white dark:ring-neutral-900 shrink-0 shadow-xs select-none`}
+            className={`${sizeClasses} rounded-full bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white font-bold flex items-center justify-center ring-2 ring-white dark:ring-neutral-900 shrink-0 shadow-xs select-none overflow-hidden`}
           >
-            {member.avatar || (member.name ? member.name.slice(0, 2).toUpperCase() : 'U')}
+            {member.avatar && (member.avatar.startsWith('data:image/') || member.avatar.startsWith('http') || member.avatar.startsWith('/')) ? (
+              <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              member.avatar || (member.name ? member.name.slice(0, 2).toUpperCase() : 'U')
+            )}
           </div>
         ))}
         {remainingCount > 0 && (
