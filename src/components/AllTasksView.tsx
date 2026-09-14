@@ -26,8 +26,10 @@ export const AllTasksView: React.FC = () => {
   const { 
     tasks, 
     organizations, 
+    userOrganizations,
     teamMembers, 
     currentUserProfile, 
+    user,
     toggleTaskComplete 
   } = useTasky() as any;
 
@@ -48,7 +50,7 @@ export const AllTasksView: React.FC = () => {
     // 1. Direct orgId on task
     const taskPlanId = task.orgId || (task as any).planId;
     if (taskPlanId) {
-      const org = organizations.find((o: Organization) => o.id === taskPlanId);
+      const org = (userOrganizations || organizations || []).find((o: Organization) => o.id === taskPlanId);
       if (org) return org;
     }
     // 2. Map via primary assignee's organization
@@ -57,7 +59,7 @@ export const AllTasksView: React.FC = () => {
       if (member) {
         const orgId = member.orgId || (member.orgIds && member.orgIds[0]);
         if (orgId) {
-          const org = organizations.find((o: Organization) => o.id === orgId);
+          const org = (userOrganizations || organizations || []).find((o: Organization) => o.id === orgId);
           if (org) return org;
         }
       }
@@ -84,7 +86,27 @@ export const AllTasksView: React.FC = () => {
 
   // Filtered & Sorted Tasks
   const filteredTasks = useMemo(() => {
+    const isSuperAdmin = currentUserProfile?.email?.toLowerCase().trim() === 'webtasky@gmail.com';
+    const activeUserOrgs = userOrganizations || [];
+
     return tasks.filter((task: Task) => {
+      // 0. Plan / Organization membership filter
+      const taskPlanId = task.orgId || (task as any).planId;
+      if (!isSuperAdmin) {
+        if (taskPlanId) {
+          // If task belongs to an org, user must be a member of that org
+          const isPartOfOrg = activeUserOrgs.some((o: any) => o.id === taskPlanId);
+          if (!isPartOfOrg) return false;
+        } else {
+          // If it is a personal task (no org), it must be assigned to or created by the user
+          const isAssigned = (task.assignedToIds && task.assignedToIds.includes(currentUserProfile?.id)) ||
+                             task.assignedTo === currentUserProfile?.id ||
+                             (currentUserProfile?.email && task.assignedTo === currentUserProfile.email);
+          const isCreator = task.createdBy === currentUserProfile?.id || (user && task.createdBy === user.uid);
+          if (!isAssigned && !isCreator && task.assignedTo) return false;
+        }
+      }
+
       // Search query filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -140,7 +162,7 @@ export const AllTasksView: React.FC = () => {
       }
       return 0;
     });
-  }, [tasks, searchQuery, selectedOrgFilter, selectedStatusFilter, selectedPriorityFilter, selectedAssigneeFilter, sortBy, organizations, teamMembers, currentUserProfile]);
+  }, [tasks, searchQuery, selectedOrgFilter, selectedStatusFilter, selectedPriorityFilter, selectedAssigneeFilter, sortBy, organizations, userOrganizations, teamMembers, currentUserProfile, user]);
 
   // Tasks grouped by plan
   const tasksByPlan = useMemo(() => {
@@ -160,7 +182,11 @@ export const AllTasksView: React.FC = () => {
     });
 
     // Add existing organizations that have tasks or if all plans filter
-    organizations.forEach((org: Organization) => {
+    const activeOrgs = currentUserProfile?.email?.toLowerCase().trim() === 'webtasky@gmail.com' 
+      ? organizations 
+      : (userOrganizations || []);
+
+    activeOrgs.forEach((org: Organization) => {
       const orgTasks = orgMap.get(org.id);
       if (orgTasks && orgTasks.length > 0) {
         groups.push({ org, tasks: orgTasks });
@@ -174,15 +200,36 @@ export const AllTasksView: React.FC = () => {
     }
 
     return groups;
-  }, [filteredTasks, organizations]);
+  }, [filteredTasks, organizations, userOrganizations, currentUserProfile]);
 
   // "Up Next" urgent items
   const upNextTasks = useMemo(() => {
+    const isSuperAdmin = currentUserProfile?.email?.toLowerCase().trim() === 'webtasky@gmail.com';
+    const activeUserOrgs = userOrganizations || [];
+
     return tasks
-      .filter((t: Task) => t.status !== 'Completed')
+      .filter((task: Task) => {
+        if (task.status === 'Completed') return false;
+
+        // Plan / Organization membership filter
+        const taskPlanId = task.orgId || (task as any).planId;
+        if (!isSuperAdmin) {
+          if (taskPlanId) {
+            const isPartOfOrg = activeUserOrgs.some((o: any) => o.id === taskPlanId);
+            if (!isPartOfOrg) return false;
+          } else {
+            const isAssigned = (task.assignedToIds && task.assignedToIds.includes(currentUserProfile?.id)) ||
+                               task.assignedTo === currentUserProfile?.id ||
+                               (currentUserProfile?.email && task.assignedTo === currentUserProfile.email);
+            const isCreator = task.createdBy === currentUserProfile?.id || (user && task.createdBy === user.uid);
+            if (!isAssigned && !isCreator && task.assignedTo) return false;
+          }
+        }
+        return true;
+      })
       .sort((a: Task, b: Task) => (a.dueDate || '').localeCompare(b.dueDate || ''))
       .slice(0, 4);
-  }, [tasks]);
+  }, [tasks, userOrganizations, currentUserProfile, user]);
 
   const resetFilters = () => {
     setSearchQuery('');
@@ -345,7 +392,7 @@ export const AllTasksView: React.FC = () => {
               className="w-full text-xs py-1.5 px-2.5 rounded-xl bg-neutral-100/80 dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 text-neutral-800 dark:text-white focus:outline-none"
             >
               <option value="all">{t('allTasks.allPlans')}</option>
-              {organizations.map((org: Organization) => (
+              {((currentUserProfile?.email?.toLowerCase().trim() === 'webtasky@gmail.com' ? organizations : userOrganizations) || []).map((org: Organization) => (
                 <option key={org.id} value={org.id}>{org.name}</option>
               ))}
             </select>
