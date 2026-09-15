@@ -30,7 +30,6 @@ import { SendEmailModal } from './SendEmailModal';
 
 export const AdminRequestsView: React.FC = () => {
   const { 
-    impersonateOrgAsManager, 
     impersonateUser, 
     deleteTeamMember, 
     updateTeamMember, 
@@ -512,17 +511,6 @@ export const AdminRequestsView: React.FC = () => {
                             </div>
                           ))}
                         </div>
-                      </div>
-
-                      {/* Sign in as Guest Manager button */}
-                      <div className="pt-3 border-t border-neutral-200/10 flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => impersonateOrgAsManager(org.id)}
-                          className="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider cursor-pointer transition-colors shadow-sm"
-                        >
-                          Sign In as Guest Manager
-                        </button>
                       </div>
                     </div>
                   );
