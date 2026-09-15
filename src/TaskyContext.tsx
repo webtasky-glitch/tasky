@@ -374,18 +374,8 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       const impersonatedOrgId = localStorage.getItem('tasky_impersonated_org_id');
       if (impersonatedOrgId) {
-        const targetOrg = organizations.find(o => o.id === impersonatedOrgId);
-        setCurrentUserProfile({
-          id: `tm-guest-manager-${impersonatedOrgId}`,
-          name: `Guest Manager (${targetOrg?.name || 'Plan'})`,
-          role: 'Guest Manager (Admin)',
-          rank: 'Manager',
-          avatar: 'GM',
-          email: emailLower,
-          orgId: impersonatedOrgId,
-          isImpersonated: true
-        });
-        return;
+        // Guest manager functionality is permanently disabled
+        localStorage.removeItem('tasky_impersonated_org_id');
       }
 
       setCurrentUserProfile({
@@ -1822,6 +1812,14 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const updateOrganization = async (org: Organization) => {
+    // Prevent changing plan status from personal (Single) to multi-people (Company or Family)
+    const existing = organizations.find(o => o.id === org.id);
+    if (existing && existing.type === 'Single' && org.type !== 'Single') {
+      const err = new Error('Plan status cannot be changed from Personal (Single) to multi-people (Company or Family).');
+      console.warn(err.message);
+      throw err;
+    }
+
     setOrganizations(prev => {
       const updated = prev.map(o => o.id === org.id ? org : o);
       localStorage.setItem('tasky_organizations', JSON.stringify(updated));
@@ -2079,10 +2077,10 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     window.location.reload();
   };
 
-  const impersonateOrgAsManager = (orgId: string) => {
-    localStorage.setItem('tasky_impersonated_org_id', orgId);
-    localStorage.removeItem('tasky_impersonated_email');
-    window.location.reload();
+  const impersonateOrgAsManager = (_orgId: string) => {
+    // Guest manager sign in is permanently disabled
+    console.warn("Guest Manager sign in is disabled.");
+    localStorage.removeItem('tasky_impersonated_org_id');
   };
 
   const stopImpersonating = () => {
