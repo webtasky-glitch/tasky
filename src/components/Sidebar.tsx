@@ -32,7 +32,9 @@ import {
   Clock,
   X,
   Camera,
-  Settings2
+  Settings2,
+  Plus,
+  Zap
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { AndroidAppModal } from './AndroidAppModal';
@@ -103,7 +105,8 @@ export const Sidebar: React.FC<{ onClose?: () => void; isMobile?: boolean }> = (
     teamMembers,
     updateTeamMember,
     isProfileModalOpen,
-    setIsProfileModalOpen
+    setIsProfileModalOpen,
+    setIsQuickTaskOpen
   } = useTasky() as any;
 
   const { t } = useTranslation();
@@ -299,6 +302,17 @@ export const Sidebar: React.FC<{ onClose?: () => void; isMobile?: boolean }> = (
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Quick Task Action Button */}
+      <div className="px-3 pt-3 shrink-0">
+        <button
+          onClick={() => setIsQuickTaskOpen(true)}
+          className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-600/20 hover:shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer border border-indigo-500 hover:scale-[1.01]"
+        >
+          <Plus className="w-4 h-4" />
+          <span>{language === 'el' ? 'Γρήγορη Εργασία' : 'Quick Task'}</span>
+        </button>
       </div>
 
       {/* Navigation Links (Smoothly Scrollable) */}
