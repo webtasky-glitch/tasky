@@ -18,6 +18,7 @@ import { AllTasksView } from './components/AllTasksView';
 import { TimelineScheduleView } from './components/TimelineScheduleView';
 import { WorkspaceSelectorModal } from './components/WorkspaceSelectorModal';
 import { ProfileSettingsModal } from './components/ProfileSettingsModal';
+import { QuickTaskModal } from './components/QuickTaskModal';
 import { HomeLandingView } from './components/HomeLandingView';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -32,7 +33,8 @@ import {
   CheckCircle2, 
   CloudOff, 
   AlertCircle,
-  FolderKanban
+  FolderKanban,
+  Plus
 } from 'lucide-react';
 import { useTranslation } from './translations';
 
@@ -70,7 +72,8 @@ const AppContent: React.FC = () => {
     syncStatus,
     triggerSync,
     isOnline,
-    setIsProfileModalOpen
+    setIsProfileModalOpen,
+    setIsQuickTaskOpen,
   } = useTasky() as any;
   const { t, language } = useTranslation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -359,6 +362,19 @@ const AppContent: React.FC = () => {
       {/* Workspace Selector Modal for Multi-Company Accounts */}
       <WorkspaceSelectorModal />
       <ProfileSettingsModal />
+      <QuickTaskModal />
+
+      {/* Quick Task Floating Action Button (FAB) */}
+      <div className="fixed bottom-20 md:bottom-8 right-6 md:right-8 z-40">
+        <button
+          type="button"
+          onClick={() => setIsQuickTaskOpen(true)}
+          className="w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30 hover:shadow-indigo-600/40 hover:scale-105 active:scale-95 transition-all cursor-pointer group border border-indigo-500"
+          title={language === 'el' ? 'Γρήγορη Εργασία' : 'Quick Task'}
+        >
+          <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
+        </button>
+      </div>
     </div>
   );
 };
