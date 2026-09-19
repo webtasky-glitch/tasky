@@ -162,6 +162,8 @@ interface TaskyContextType {
   setIsWorkspaceSelectorOpen: (open: boolean) => void;
   isProfileModalOpen: boolean;
   setIsProfileModalOpen: (open: boolean) => void;
+  isQuickTaskOpen: boolean;
+  setIsQuickTaskOpen: (open: boolean) => void;
 }
 
 const TaskyContext = createContext<TaskyContextType | undefined>(undefined);
@@ -223,6 +225,7 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [isWorkspaceSelectorOpen, setIsWorkspaceSelectorOpen] = useState<boolean>(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [isQuickTaskOpen, setIsQuickTaskOpen] = useState<boolean>(false);
 
   // Projects state
   const [projects, setProjects] = useState<Project[]>(() => {
@@ -2431,6 +2434,8 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIsWorkspaceSelectorOpen,
     isProfileModalOpen,
     setIsProfileModalOpen,
+    isQuickTaskOpen,
+    setIsQuickTaskOpen,
     projects,
     activeProjectId,
     setActiveProjectId,
@@ -2513,6 +2518,7 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     selectedOrgId,
     isWorkspaceSelectorOpen,
     isProfileModalOpen,
+    isQuickTaskOpen,
     projects,
     activeProjectId,
     messages,
