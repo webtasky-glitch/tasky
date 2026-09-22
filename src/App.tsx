@@ -3,7 +3,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { TaskyProvider, useTasky } from './TaskyContext';
 import { Sidebar } from './components/Sidebar';
 import { DashboardView } from './components/DashboardView';
-import { CalendarView } afrom './components/CalendarView';
+import { CalendarView } from './components/CalendarView';
 import { HabitsView } from './components/HabitsView';
 import { StatisticsView } from './components/StatisticsView';
 import { CreateMemberView } from './components/CreateMemberView';
