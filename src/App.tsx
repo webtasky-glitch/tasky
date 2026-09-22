@@ -20,6 +20,7 @@ import { WorkspaceSelectorModal } from './components/WorkspaceSelectorModal';
 import { ProfileSettingsModal } from './components/ProfileSettingsModal';
 import { QuickTaskModal } from './components/QuickTaskModal';
 import { HomeLandingView } from './components/HomeLandingView';
+const appLogo = 'https://scontent.cdninstagram.com/v/t51.82787-19/802457122_18106060363973151_1245504792837961412_n.jpg?stp=dst-jpg_s150x150_tt6&_nc_cat=106&ccb=7-5&_nc_sid=f7ccc5&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLnd3dy4xMDgwLkMzIn0%3D&_nc_ohc=drz-cx1nok4Q7kNvwFYMv6_&_nc_oc=Adq5tXTPCLbD_F5-05586oej9V34VrMTkJnZjkuAiv7FmXn89B9bhtpki_0VhFQL4cs0igLx7b7fH8itAUT-8xTW&_nc_zt=24&_nc_ht=scontent.cdninstagram.com&_nc_gid=9-lFTZA02IFY1v8otgJp5w&_nc_ss=7b689&oh=00_AQIKREm-sOwXAd7T03Wi8-W7hW5WOJRbi4uN8hCSz6XTHw&oe=6AB8A15A';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Menu, 
@@ -206,7 +207,7 @@ const AppContent: React.FC = () => {
               />
             ) : (
               <img 
-                src="https://i.postimg.cc/ZKPq2Nyd/file-00000000c52481f4801a2d88eaae2b34.png" 
+                src={appLogo} 
                 alt="Tasky Logo" 
                 className="w-7 h-7 object-cover rounded-lg shadow-sm"
                 referrerPolicy="no-referrer"
