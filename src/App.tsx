@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import { TaskyProvider, useTasky } from './TaskyContext';
 import { Sidebar } from './components/Sidebar';
@@ -79,6 +79,16 @@ const AppContent: React.FC = () => {
   const { t, language } = useTranslation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isGuest = localStorage.getItem('tasky_guest_mode') === 'true';
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') === 'quick-task') {
+      setIsQuickTaskOpen(true);
+      // Clean up the URL search param so it doesn't trigger again on reload
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, [setIsQuickTaskOpen]);
 
   const userOrg = currentUserProfile?.orgId && (userOrganizations || [])
     ? userOrganizations.find((o: any) => o.id === currentUserProfile.orgId)
