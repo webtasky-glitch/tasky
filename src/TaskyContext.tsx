@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { Task, Category, Habit, TeamMember, TaskPriority, TaskStatus, RecurringType, ChecklistItem, Attachment, Comment, Organization, Message, UserRank, AiSupportQA, Project, PrivacyConsents, AuditLog, DataRetentionPolicy, SecurityIncident, FamilyRole, PlanPermissions, DEFAULT_ROLE_PERMISSIONS } from './types';
+import { Task, Category, Habit, TeamMember, TaskPriority, TaskStatus, RecurringType, ChecklistItem, Attachment, Comment, Organization, Message, UserRank, AiSupportQA, Project, PrivacyConsents, AuditLog, DataRetentionPolicy, SecurityIncident, FamilyRole, PlanPermissions, DEFAULT_ROLE_PERMISSIONS, SignInLog } from './types';
 import { INITIAL_TASKS, INITIAL_CATEGORIES, INITIAL_HABITS, INITIAL_TEAM_MEMBERS } from './initialData';
 import { db, cleanUndefined, auth } from './firebase';
 import { collection, onSnapshot, doc, setDoc as firestoreSetDoc, deleteDoc, getDocs } from 'firebase/firestore';
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { getNextDueDate, generateFutureRecurringTasks } from './utils/recurringUtils';
+import { fetchClientGeoInfo, buildSignInLogEntry } from './utils/ipTracker';
 
 export enum OperationType {
   CREATE = 'create',
@@ -158,6 +159,9 @@ interface TaskyContextType {
   securityIncidents: SecurityIncident[];
   reportSecurityIncident: (incident: Omit<SecurityIncident, 'id' | 'detectedAt'>) => Promise<void>;
   updateFamilyRole: (memberId: string, role: FamilyRole) => Promise<void>;
+  signInLogs: SignInLog[];
+  recordSignInEvent: (userObj: any, method?: string) => Promise<SignInLog | null>;
+  clearSignInLogs: () => Promise<void>;
   isWorkspaceSelectorOpen: boolean;
   setIsWorkspaceSelectorOpen: (open: boolean) => void;
   isProfileModalOpen: boolean;
@@ -292,6 +296,15 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [securityIncidents, setSecurityIncidents] = useState<SecurityIncident[]>(() => {
     try {
       const saved = localStorage.getItem('tasky_security_incidents');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [signInLogs, setSignInLogs] = useState<SignInLog[]>(() => {
+    try {
+      const saved = localStorage.getItem('tasky_signin_logs');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -470,6 +483,21 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => unsubscribe();
   }, []);
 
+  // Record active session sign-in IP once per browser session
+  useEffect(() => {
+    if (!user) return;
+    try {
+      const userKey = user.uid || user.email || 'active-user';
+      const sessionFlag = 'tasky_ip_logged_' + userKey;
+      if (!sessionStorage.getItem(sessionFlag)) {
+        sessionStorage.setItem(sessionFlag, 'true');
+        recordSignInEvent(user, 'session_resume');
+      }
+    } catch (e) {
+      console.warn("Session IP log check error:", e);
+    }
+  }, [user]);
+
   const logout = async () => {
     try {
       localStorage.removeItem('tasky_local_user');
@@ -645,6 +673,25 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.error("Firestore aiSupportQA subscription error:", error);
     });
 
+    const unsubSignInLogs = onSnapshot(collection(db, 'signInLogs'), (snapshot) => {
+      const list: SignInLog[] = [];
+      const seenIds = new Set<string>();
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const item = { id: doc.id, ...data } as SignInLog;
+        if (item && item.id && !seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          list.push(item);
+        }
+      });
+      // Sort by timestamp descending (newest sign-ins first)
+      list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setSignInLogs(list);
+      safeSaveLocalStorage('tasky_signin_logs', list);
+    }, (error) => {
+      console.warn("Firestore signInLogs subscription notice:", error);
+    });
+
     return () => {
       unsubTasks();
       unsubCategories();
@@ -654,6 +701,7 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       unsubProjects();
       unsubMessages();
       unsubAiSupportQA();
+      unsubSignInLogs();
     };
   }, []);
 
@@ -2246,6 +2294,67 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const recordSignInEvent = async (userObj: any, method: string = 'password'): Promise<SignInLog | null> => {
+    try {
+      if (!userObj) return null;
+      const userId = userObj.uid || userObj.id || 'user';
+      const userEmail = (userObj.email || '').toLowerCase().trim();
+      const userName = userObj.displayName || userObj.name || userEmail.split('@')[0] || 'User';
+
+      const geoInfo = await fetchClientGeoInfo();
+      const newLog = buildSignInLogEntry({
+        userId,
+        userEmail,
+        userName,
+        geoInfo,
+        method
+      });
+
+      setSignInLogs(prev => {
+        const filtered = prev.filter(l => l.id !== newLog.id);
+        const updated = [newLog, ...filtered.slice(0, 199)];
+        safeSaveLocalStorage('tasky_signin_logs', updated);
+        return updated;
+      });
+
+      if (db) {
+        setDoc(doc(db, 'signInLogs', newLog.id), newLog).catch(e => console.warn("Firestore sign-in log write notice:", e));
+
+        // Update member record in team collection if user exists
+        const locationSummary = [geoInfo.city, geoInfo.country].filter(Boolean).join(', ');
+        const matched = teamMembers.find(m => m.email && m.email.toLowerCase().trim() === userEmail);
+        if (matched) {
+          const updatedMember = {
+            ...matched,
+            lastSignInIp: geoInfo.ip,
+            lastSignInAt: newLog.timestamp,
+            lastSignInLocation: locationSummary
+          };
+          setDoc(doc(db, 'team', matched.id), updatedMember).catch(e => console.warn("Team doc sign-in update notice:", e));
+        }
+      }
+
+      // Record to audit logs as well
+      await logAuditEvent({
+        action: 'sign_in',
+        resourceType: 'auth',
+        actorId: userId,
+        actorEmail: userEmail,
+        details: `Sign-in via ${method} from IP ${geoInfo.ip} (${[geoInfo.city, geoInfo.country].filter(Boolean).join(', ') || 'Unknown location'}) using ${geoInfo.device || 'device'}`
+      });
+
+      return newLog;
+    } catch (err) {
+      console.warn("Could not record sign-in IP event:", err);
+      return null;
+    }
+  };
+
+  const clearSignInLogs = async () => {
+    setSignInLogs([]);
+    localStorage.removeItem('tasky_signin_logs');
+  };
+
   const updateDataRetentionPolicy = async (policy: Partial<DataRetentionPolicy>) => {
     const updated = { ...dataRetentionPolicy, ...policy };
     setDataRetentionPolicy(updated);
@@ -2508,6 +2617,9 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     securityIncidents,
     reportSecurityIncident,
     updateFamilyRole,
+    signInLogs,
+    recordSignInEvent,
+    clearSignInLogs,
   }), [
     tasks,
     userCategories,
@@ -2535,7 +2647,8 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     privacyConsents,
     auditLogs,
     dataRetentionPolicy,
-    securityIncidents
+    securityIncidents,
+    signInLogs
   ]);
 
   return (
