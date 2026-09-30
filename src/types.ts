@@ -211,6 +211,26 @@ export interface TeamMember {
   joinedAt?: string;
   familyRole?: 'parent' | 'teen' | 'child'; // GDPR family protection role
   accountCategory?: 'Personal' | 'Family' | 'Company';
+  lastSignInIp?: string;
+  lastSignInAt?: string;
+  lastSignInLocation?: string;
+}
+
+export interface SignInLog {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName?: string;
+  ip: string;
+  city?: string;
+  region?: string;
+  country?: string;
+  countryCode?: string;
+  org?: string;
+  device?: string;
+  userAgent?: string;
+  timestamp: string;
+  method?: string;
 }
 
 export type FamilyRole = 'parent' | 'teen' | 'child';
