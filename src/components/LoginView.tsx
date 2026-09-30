@@ -34,7 +34,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { HomeLandingView } from './HomeLandingView';
 
 export const LoginView: React.FC = () => {
-  const { darkMode, setUser, language, setLanguage, teamMembers } = useTasky() as any;
+  const { darkMode, setUser, language, setLanguage, teamMembers, recordSignInEvent } = useTasky() as any;
   const { t } = useTranslation();
   
   // Real-time network status detection
@@ -155,6 +155,7 @@ export const LoginView: React.FC = () => {
           localStorage.setItem('tasky_local_user', JSON.stringify(mockUser));
           setUser(mockUser);
           saveToKeychain(email, password);
+          if (recordSignInEvent) recordSignInEvent(mockUser, 'admin');
           setSuccess('Welcome back, Super Admin!');
           return;
         } else {
@@ -186,6 +187,7 @@ export const LoginView: React.FC = () => {
           localStorage.setItem('tasky_local_user', JSON.stringify(mockUser));
           setUser(mockUser);
           saveToKeychain(email, password);
+          if (recordSignInEvent) recordSignInEvent(mockUser, 'password');
           setSuccess('Welcome back!');
           return;
         } else {
@@ -197,8 +199,11 @@ export const LoginView: React.FC = () => {
 
       // 3. Fallback to Firebase Authentication
       try {
-        await signInWithEmailAndPassword(auth, email, password);
+        const userCred = await signInWithEmailAndPassword(auth, email, password);
         saveToKeychain(email, password);
+        if (recordSignInEvent && userCred.user) {
+          recordSignInEvent(userCred.user, 'firebase_auth');
+        }
         setSuccess('Welcome back!');
       } catch (fbErr: any) {
         console.warn("Firebase authentication notice:", fbErr);
@@ -310,6 +315,7 @@ export const LoginView: React.FC = () => {
       };
       localStorage.setItem('tasky_local_user', JSON.stringify(mockUser));
       setUser(mockUser);
+      if (recordSignInEvent) recordSignInEvent(mockUser, 'registration');
       setSuccess('Workspace created successfully! Welcome to your new task dashboard.');
     } catch (err: any) {
       console.error("Personal/Family Registration Error:", err);
