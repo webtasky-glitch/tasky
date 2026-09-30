@@ -157,6 +157,27 @@
         "read": "true",
         "write": "true"
       }
+    },
+    "signInLogs": {
+      "fields": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string", "optional": true },
+        "ip": { "type": "string" },
+        "city": { "type": "string", "optional": true },
+        "region": { "type": "string", "optional": true },
+        "country": { "type": "string", "optional": true },
+        "countryCode": { "type": "string", "optional": true },
+        "device": { "type": "string", "optional": true },
+        "userAgent": { "type": "string", "optional": true },
+        "timestamp": { "type": "string" },
+        "method": { "type": "string", "optional": true }
+      },
+      "rules": {
+        "read": "true",
+        "write": "true"
+      }
     }
   }
 }
