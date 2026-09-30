@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useTasky } from '../TaskyContext';
 import { TeamMember } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, Trash2, Search, Shield, Building2, UserX, AlertTriangle, CheckCircle2, UserPlus, Mail, Key, Copy, Check, RefreshCw, Sparkles } from 'lucide-react';
+import { Users, Trash2, Search, Shield, Building2, UserX, AlertTriangle, CheckCircle2, UserPlus, Mail, Key, Copy, Check, RefreshCw, Sparkles, Globe } from 'lucide-react';
 import { SendEmailModal } from './SendEmailModal';
 
 export const ManageUsersView: React.FC<{ onSwitchToAdd?: () => void }> = ({ onSwitchToAdd }) => {
@@ -349,6 +349,12 @@ export const ManageUsersView: React.FC<{ onSwitchToAdd?: () => void }> = ({ onSw
                         <span>•</span>
                         <span>Workspace: <strong className="text-neutral-600 dark:text-neutral-300 font-medium">{getOrgName(member.orgId)}</strong></span>
                       </div>
+                      {member.lastSignInIp && (
+                        <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-mono mt-1">
+                          <Globe className="w-3.5 h-3.5 shrink-0" />
+                          <span>Last IP: <strong>{member.lastSignInIp}</strong> {member.lastSignInLocation ? `(${member.lastSignInLocation})` : ''}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
