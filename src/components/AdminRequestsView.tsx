@@ -23,25 +23,90 @@ import {
   Smile,
   Edit2,
   Trash2,
-  Shield
+  Shield,
+  Globe,
+  Laptop,
+  Smartphone,
+  Monitor,
+  Download,
+  RefreshCw,
+  Copy,
+  MapPin,
+  Activity,
+  HardDrive
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SendEmailModal } from './SendEmailModal';
+import { getCountryFlag } from '../utils/ipTracker';
+import { SignInLog } from '../types';
 
 export const AdminRequestsView: React.FC = () => {
   const { 
     impersonateUser, 
     deleteTeamMember, 
     updateTeamMember, 
-    currentUserProfile 
+    currentUserProfile,
+    signInLogs,
+    recordSignInEvent,
+    clearSignInLogs,
+    user
   } = useTasky() as any;
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   
-  const [activeTab, setActiveTab] = useState<'requests' | 'family-personal' | 'users'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'family-personal' | 'users' | 'signins'>('requests');
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // IP Tracking and Sign-in logs state
+  const [ipSearchTerm, setIpSearchTerm] = useState('');
+  const [ipMethodFilter, setIpMethodFilter] = useState('all');
+  const [copiedIpId, setCopiedIpId] = useState<string | null>(null);
+  const [isRecordingCurrentIp, setIsRecordingCurrentIp] = useState(false);
+  const [ipFeedbackMsg, setIpFeedbackMsg] = useState<string | null>(null);
+
+  const handleCopyIp = (ip: string, id: string) => {
+    navigator.clipboard.writeText(ip);
+    setCopiedIpId(id);
+    setTimeout(() => setCopiedIpId(null), 2000);
+  };
+
+  const handleRecordCurrentIpNow = async () => {
+    setIsRecordingCurrentIp(true);
+    try {
+      const activeUser = user || {
+        uid: currentUserProfile?.id || 'admin-webtasky',
+        email: currentUserProfile?.email || 'webtasky@gmail.com',
+        displayName: currentUserProfile?.name || 'Super Admin'
+      };
+      const res = await recordSignInEvent(activeUser, 'admin_check');
+      if (res) {
+        setIpFeedbackMsg(`Successfully logged IP: ${res.ip} (${res.city || ''} ${res.country || ''})`);
+      } else {
+        setIpFeedbackMsg('Recorded sign-in event.');
+      }
+    } catch (e: any) {
+      setIpFeedbackMsg('Failed to fetch IP: ' + (e.message || 'Network error'));
+    } finally {
+      setIsRecordingCurrentIp(false);
+      setTimeout(() => setIpFeedbackMsg(null), 4000);
+    }
+  };
+
+  const handleExportIpLogs = () => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(signInLogs || [], null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `tasky-signin-ip-logs-${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } catch (e) {
+      console.error("Export error:", e);
+    }
+  };
 
   const [editingMember, setEditingMember] = useState<any | null>(null);
   const [editMemberName, setEditMemberName] = useState('');
@@ -249,6 +314,18 @@ export const AdminRequestsView: React.FC = () => {
           >
             <Users className="w-3.5 h-3.5 text-indigo-500" />
             User Directory ({teamMembers.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('signins')}
+            className={`px-4 py-2 text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center gap-2 ${
+              activeTab === 'signins'
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5 text-emerald-400" />
+            Sign-in & IP Logs ({signInLogs?.length || 0})
           </button>
         </div>
       </div>
@@ -523,7 +600,7 @@ export const AdminRequestsView: React.FC = () => {
               </div>
             )}
           </div>
-        ) : (
+        ) : activeTab === 'users' ? (
           /* SECTION 3: User Directory */
           <div className="flex-1 flex flex-col min-h-0 space-y-4">
             {/* Search Input */}
@@ -587,6 +664,12 @@ export const AdminRequestsView: React.FC = () => {
                               <span className="text-[10px] px-2 py-0.5 bg-indigo-500/10 text-indigo-500 rounded-lg font-mono font-semibold mt-1 inline-block">
                                 {m.role || 'Member'}
                               </span>
+                              {m.lastSignInIp && (
+                                <div className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-mono mt-1">
+                                  <Globe className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">Last IP: {m.lastSignInIp} {m.lastSignInLocation ? `(${m.lastSignInLocation})` : ''}</span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -668,6 +751,276 @@ export const AdminRequestsView: React.FC = () => {
                 </div>
               )}
             </div>
+          </div>
+        ) : (
+          /* SECTION 4: Sign-in & IP Logs (Καταγραφή Συνδέσεων & IP) */
+          <div className="flex-1 flex flex-col min-h-0 space-y-4">
+            {/* Header & Controls Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-white/20 dark:bg-white/5 border border-white/20 dark:border-white/5 rounded-2xl">
+              <div>
+                <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-emerald-500" />
+                  <span>Sign-in IP Activity & Audit Logs (Ιστορικό IP Συνδέσεων)</span>
+                </h3>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                  Live real-time monitoring of user logins, IP addresses, city & country location, and client devices.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Live IP Tracking Active
+                </span>
+
+                <button
+                  type="button"
+                  onClick={handleRecordCurrentIpNow}
+                  disabled={isRecordingCurrentIp}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRecordingCurrentIp ? 'animate-spin' : ''}`} />
+                  <span>{isRecordingCurrentIp ? 'Tracking...' : 'Log Current IP'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExportIpLogs}
+                  className="px-3 py-1.5 rounded-xl bg-white/40 dark:bg-white/10 hover:bg-white/60 dark:hover:bg-white/20 text-neutral-800 dark:text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-white/20"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Export JSON</span>
+                </button>
+
+                {signInLogs && signInLogs.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm("Are you sure you want to clear the local IP log history?")) {
+                        clearSignInLogs && clearSignInLogs();
+                      }
+                    }}
+                    className="p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold transition-all border border-rose-500/20 cursor-pointer"
+                    title="Clear IP logs"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Feedback notification */}
+            {ipFeedbackMsg && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-semibold flex items-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+                <span>{ipFeedbackMsg}</span>
+              </motion.div>
+            )}
+
+            {/* Metric Statistics Cards */}
+            {(() => {
+              const logsList = signInLogs || [];
+              const totalEvents = logsList.length;
+              const uniqueIps = new Set(logsList.map((l: any) => l.ip)).size;
+              const uniqueEmails = new Set(logsList.map((l: any) => l.userEmail)).size;
+              const uniqueCountries = new Set(logsList.map((l: any) => l.country).filter(Boolean)).size;
+
+              return (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
+                  <div className="p-3.5 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/30 dark:border-white/5">
+                    <span className="text-[10px] uppercase font-mono font-bold text-neutral-400 block">Total Sign-ins</span>
+                    <span className="text-xl font-bold text-neutral-900 dark:text-white mt-0.5 block">{totalEvents}</span>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/30 dark:border-white/5">
+                    <span className="text-[10px] uppercase font-mono font-bold text-emerald-500 block">Unique IP Addresses</span>
+                    <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 block">{uniqueIps}</span>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/30 dark:border-white/5">
+                    <span className="text-[10px] uppercase font-mono font-bold text-indigo-500 block">Unique Accounts</span>
+                    <span className="text-xl font-bold text-indigo-600 dark:text-indigo-400 mt-0.5 block">{uniqueEmails}</span>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/30 dark:border-white/5">
+                    <span className="text-[10px] uppercase font-mono font-bold text-purple-500 block">Active Countries</span>
+                    <span className="text-xl font-bold text-purple-600 dark:text-purple-400 mt-0.5 block">{uniqueCountries || (totalEvents > 0 ? 1 : 0)}</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Search and Filters */}
+            <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 w-4 h-4 text-neutral-400 dark:text-neutral-500 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filter by IP address (e.g. 192.168), email, username, city, or country..."
+                  value={ipSearchTerm}
+                  onChange={(e) => setIpSearchTerm(e.target.value)}
+                  className="w-full text-xs pl-9 pr-4 py-2.5 bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/5 focus:bg-white dark:focus:bg-neutral-900 rounded-xl outline-none text-neutral-800 dark:text-white transition-all font-medium placeholder-neutral-400"
+                />
+              </div>
+
+              <select
+                value={ipMethodFilter}
+                onChange={(e) => setIpMethodFilter(e.target.value)}
+                className="text-xs font-semibold px-3 py-2 bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/5 rounded-xl text-neutral-800 dark:text-white focus:outline-none shrink-0"
+              >
+                <option value="all">All Sign-in Methods</option>
+                <option value="admin">Super Admin Portal</option>
+                <option value="password">Password Sign-in</option>
+                <option value="registration">Registration</option>
+                <option value="session_resume">Active Session</option>
+              </select>
+            </div>
+
+            {/* List of IP Sign-in Logs */}
+            {(() => {
+              const logsList = signInLogs || [];
+              const filtered = logsList.filter((log: any) => {
+                const q = ipSearchTerm.toLowerCase().trim();
+                const matchesSearch = !q ||
+                  (log.ip && log.ip.toLowerCase().includes(q)) ||
+                  (log.userEmail && log.userEmail.toLowerCase().includes(q)) ||
+                  (log.userName && log.userName.toLowerCase().includes(q)) ||
+                  (log.city && log.city.toLowerCase().includes(q)) ||
+                  (log.country && log.country.toLowerCase().includes(q)) ||
+                  (log.device && log.device.toLowerCase().includes(q));
+                const matchesMethod = ipMethodFilter === 'all' || log.method === ipMethodFilter;
+                return matchesSearch && matchesMethod;
+              });
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="text-center py-16 bg-white/10 dark:bg-white/5 rounded-[32px] border border-white/20 dark:border-white/10 text-neutral-400 text-xs flex flex-col items-center justify-center gap-3">
+                    <Globe className="w-10 h-10 text-emerald-500/60" />
+                    <span className="font-bold text-neutral-800 dark:text-white">
+                      {logsList.length === 0 ? 'No sign-in IP events captured yet.' : 'No sign-in records match your filter criteria.'}
+                    </span>
+                    <p className="text-[11px] text-neutral-500 max-w-md">
+                      Every time a user signs in, Tasky automatically captures their IP address, location, and device details for security auditing.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleRecordCurrentIpNow}
+                      className="mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-all shadow-xs cursor-pointer flex items-center gap-2"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Record Current Session IP</span>
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {filtered.map((log: any) => {
+                      const flag = getCountryFlag(log.countryCode);
+                      const isMobile = /Mobile|Android|iPhone/i.test(log.device || '');
+                      const formattedTime = new Date(log.timestamp).toLocaleString();
+
+                      return (
+                        <div
+                          key={log.id}
+                          className="p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/5 hover:border-emerald-500/40 transition-all flex flex-col justify-between gap-3 shadow-xs"
+                        >
+                          {/* Top: User info + Method badge */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
+                                {log.userName ? log.userName.slice(0, 2).toUpperCase() : 'US'}
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-sm text-neutral-900 dark:text-white truncate">
+                                  {log.userName || log.userEmail.split('@')[0]}
+                                </h4>
+                                <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                                  {log.userEmail}
+                                </p>
+                              </div>
+                            </div>
+
+                            <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold border shrink-0 ${
+                              log.method === 'admin'
+                                ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
+                                : log.method === 'registration'
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                : log.method === 'session_resume'
+                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                                : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20'
+                            }`}>
+                              {log.method === 'admin' ? 'Admin Portal' : log.method === 'registration' ? 'New Registration' : log.method === 'session_resume' ? 'Active Session' : 'Password'}
+                            </span>
+                          </div>
+
+                          {/* Middle: IP Address (Copyable) & Location */}
+                          <div className="p-3 bg-white/40 dark:bg-neutral-850/60 rounded-xl border border-neutral-200/40 dark:border-white/5 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-[10px] uppercase font-mono font-bold text-neutral-400">IP:</span>
+                                <span className="font-mono font-bold text-xs text-neutral-900 dark:text-white bg-neutral-200/60 dark:bg-white/10 px-2 py-0.5 rounded-lg select-all">
+                                  {log.ip}
+                                </span>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleCopyIp(log.ip, log.id)}
+                                className="px-2 py-1 bg-white/60 dark:bg-white/10 hover:bg-neutral-200 dark:hover:bg-white/20 text-neutral-700 dark:text-neutral-300 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                                title="Copy IP to clipboard"
+                              >
+                                {copiedIpId === log.id ? (
+                                  <>
+                                    <Check className="w-3 h-3 text-emerald-500" />
+                                    <span className="text-emerald-500">Copied</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3 h-3" />
+                                    <span>Copy</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+
+                            {/* Location line */}
+                            <div className="flex items-center gap-1.5 text-xs text-neutral-700 dark:text-neutral-300 font-medium">
+                              <span className="text-base leading-none">{flag}</span>
+                              <span className="truncate">
+                                {[log.city, log.region, log.country].filter(Boolean).join(', ') || 'Unknown Location'}
+                              </span>
+                            </div>
+
+                            {/* Client device line */}
+                            <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
+                              {isMobile ? (
+                                <Smartphone className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                              ) : (
+                                <Monitor className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                              )}
+                              <span className="truncate">{log.device || 'Web Browser'}</span>
+                            </div>
+                          </div>
+
+                          {/* Bottom: Date & Timestamp */}
+                          <div className="flex items-center justify-between text-[10px] text-neutral-400 font-mono">
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {formattedTime}
+                            </span>
+                            <span>ID: {log.id.slice(0, 14)}...</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
