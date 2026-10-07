@@ -206,7 +206,7 @@ export const HomeLandingView: React.FC<HomeLandingViewProps> = ({
               >
                 <option value="" disabled>{isEl ? '🌐 Προσομοίωση Subdomain' : '🌐 Simulate Subdomain'}</option>
                 {organizations.filter((o: any) => o.subdomain).map((o: any) => (
-                  <option key={o.id} value={o.subdomain}>{o.name} ({o.subdomain}.tasky.local)</option>
+                  <option key={o.id} value={o.subdomain}>{o.name} ({o.subdomain}.webtasky.com)</option>
                 ))}
               </select>
             )}
