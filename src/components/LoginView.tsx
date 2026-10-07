@@ -34,7 +34,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { HomeLandingView } from './HomeLandingView';
 
 export const LoginView: React.FC = () => {
-  const { darkMode, setUser, language, setLanguage, teamMembers, recordSignInEvent } = useTasky() as any;
+  const { darkMode, setUser, language, setLanguage, teamMembers, recordSignInEvent, organizations } = useTasky() as any;
   const { t } = useTranslation();
   
   // Real-time network status detection
@@ -440,8 +440,30 @@ export const LoginView: React.FC = () => {
           <span>{language === 'el' ? 'Αρχική Σελίδα' : 'Back to Home'}</span>
         </button>
 
-        {/* Floating Language Selection */}
-        <div className="pointer-events-auto flex gap-1 p-1 rounded-xl bg-white/40 dark:bg-black/20 border border-white/50 dark:border-white/5 shadow-md">
+        {/* Right side controls (Dropdown + Language Selector) */}
+        <div className="pointer-events-auto flex items-center gap-2">
+          {/* SaaS Subdomain Simulator Dropdown */}
+          {organizations && organizations.filter((o: any) => o.subdomain).length > 0 && (
+            <select
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val) {
+                  localStorage.setItem('tasky_simulated_subdomain', val);
+                  window.location.reload();
+                }
+              }}
+              defaultValue=""
+              className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#12131f] border border-white/50 dark:border-white/5 shadow-md text-xs font-bold text-indigo-600 dark:text-indigo-400 focus:outline-none cursor-pointer [&>option]:bg-white dark:[&>option]:bg-neutral-900"
+            >
+              <option value="" disabled>{language === 'el' ? '🌐 Προσομοίωση' : '🌐 Simulate Subdomain'}</option>
+              {organizations.filter((o: any) => o.subdomain).map((o: any) => (
+                <option key={o.id} value={o.subdomain}>{o.name}</option>
+              ))}
+            </select>
+          )}
+
+          {/* Floating Language Selection */}
+          <div className="flex gap-1 p-1 rounded-xl bg-white/40 dark:bg-black/20 border border-white/50 dark:border-white/5 shadow-md">
           <button
             type="button"
             onClick={() => setLanguage('en')}
@@ -468,6 +490,7 @@ export const LoginView: React.FC = () => {
           </button>
         </div>
       </div>
+    </div>
 
       {/* Dynamic ambient bubble background */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-indigo-500/10 dark:bg-indigo-500/5 blur-3xl -z-10 animate-pulse" />
