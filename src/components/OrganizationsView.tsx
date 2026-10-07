@@ -5,7 +5,7 @@ import { useTranslation } from '../translations';
 import { motion } from 'motion/react';
 import { AssigneeAvatarStack } from './AssigneeAvatarStack';
 import { isTaskAssignedToUser, getTaskAssigneeIds } from '../utils/taskFilter';
-import { Building2, Plus, Edit2, Trash2, Users, UserCheck, Calendar, Shield, Save, X, Settings2, CheckSquare, Flag, AlertCircle, Clock, CheckCircle2, Circle, KeyRound, Copy, Share2, Check, Sparkles, CheckCheck } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Users, UserCheck, Calendar, Shield, Save, X, Settings2, CheckSquare, Flag, AlertCircle, Clock, CheckCircle2, Circle, KeyRound, Copy, Share2, Check, Sparkles, CheckCheck, Globe } from 'lucide-react';
 
 const extractDominantColor = (base64Str: string): Promise<string> => {
   return new Promise((resolve) => {
@@ -502,6 +502,11 @@ export const OrganizationsView: React.FC = () => {
                   placeholder="e.g. google, custom-brand"
                   className="w-full text-xs glass-input rounded-xl px-4 py-2.5 focus:outline-none text-neutral-800 dark:text-white font-medium font-mono"
                 />
+                {newOrgSubdomain && (
+                  <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold font-mono mt-0.5">
+                    🌐 {newOrgSubdomain}.webtasky.com
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -584,6 +589,11 @@ export const OrganizationsView: React.FC = () => {
                           placeholder="e.g. google"
                           className="w-full text-xs glass-input rounded-xl px-3 py-2 focus:outline-none font-medium font-mono"
                         />
+                        {editSubdomain && (
+                          <p className="text-[9px] text-indigo-600 dark:text-indigo-400 font-semibold font-mono mt-0.5">
+                            🌐 {editSubdomain}.webtasky.com
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-neutral-500">Edit Type</label>
@@ -726,6 +736,20 @@ export const OrganizationsView: React.FC = () => {
                               <h4 className="text-base font-bold text-neutral-800 dark:text-white mt-2 leading-snug">
                                 {org.name}
                               </h4>
+                              {org.subdomain && (
+                                <div 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    localStorage.setItem('tasky_simulated_subdomain', org.subdomain);
+                                    window.location.reload();
+                                  }}
+                                  className="mt-1.5 inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold font-mono hover:underline cursor-pointer"
+                                  title={language === 'el' ? 'Κάντε κλικ για προσομοίωση της ιστοσελίδας' : 'Click to simulate this subdomain site'}
+                                >
+                                  <Globe className="w-3.5 h-3.5 shrink-0" />
+                                  <span>{org.subdomain}.webtasky.com</span>
+                                </div>
+                              )}
                             </div>
 
                             <div className="flex gap-1 shrink-0">
