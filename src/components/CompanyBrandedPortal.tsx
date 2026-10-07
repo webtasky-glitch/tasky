@@ -295,7 +295,7 @@ export const CompanyBrandedPortal: React.FC<CompanyBrandedPortalProps> = ({
               : `SaaS Subdomain Active: Portal site of ${company.name}`}
           </span>
           <span className="font-mono text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-extrabold ml-1 uppercase">
-            {subdomain}.tasky.local
+            {subdomain}.webtasky.com
           </span>
         </div>
         <button
@@ -327,7 +327,7 @@ export const CompanyBrandedPortal: React.FC<CompanyBrandedPortalProps> = ({
                 {company.name} <span className="text-[10px] uppercase font-mono font-bold text-neutral-400">Workspace</span>
               </h1>
               <p className="text-[10px] text-neutral-400 font-semibold font-mono">
-                {company.subdomain}.tasky.local
+                {company.subdomain}.webtasky.com
               </p>
             </div>
           </div>
