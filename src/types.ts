@@ -172,6 +172,7 @@ export interface Organization {
   createdBy?: string;
   logo?: string;
   themeColor?: string;
+  subdomain?: string;
   code?: string; // Join code for inviting users to this plan (e.g. PLAN-9X2K4M)
   managerId?: string; // Plan Manager assigned by Admin
   managerName?: string;
