@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import { TaskyProvider, useTasky } from './TaskyContext';
 import { Sidebar } from './components/Sidebar';
@@ -20,7 +20,8 @@ import { WorkspaceSelectorModal } from './components/WorkspaceSelectorModal';
 import { ProfileSettingsModal } from './components/ProfileSettingsModal';
 import { QuickTaskModal } from './components/QuickTaskModal';
 import { HomeLandingView } from './components/HomeLandingView';
-const appLogo = 'https://scontent.cdninstagram.com/v/t51.82787-19/802457122_18106060363973151_1245504792837961412_n.jpg?stp=dst-jpg_s150x150_tt6&_nc_cat=106&ccb=7-5&_nc_sid=f7ccc5&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLnd3dy4xMDgwLkMzIn0%3D&_nc_ohc=drz-cx1nok4Q7kNvwFYMv6_&_nc_oc=Adq5tXTPCLbD_F5-05586oej9V34VrMTkJnZjkuAiv7FmXn89B9bhtpki_0VhFQL4cs0igLx7b7fH8itAUT-8xTW&_nc_zt=24&_nc_ht=scontent.cdninstagram.com&_nc_gid=9-lFTZA02IFY1v8otgJp5w&_nc_ss=7b689&oh=00_AQIKREm-sOwXAd7T03Wi8-W7hW5WOJRbi4uN8hCSz6XTHw&oe=6AB8A15A';
+import { CompanyBrandedPortal } from './components/CompanyBrandedPortal';
+import appLogo from './assets/app_logo.png';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Menu, 
@@ -60,6 +61,32 @@ const adjustHexColor = (hex: string, percent: number): string => {
   }
 };
 
+const getCompanySubdomain = (): string | null => {
+  const hostname = window.location.hostname;
+  const searchParams = new URLSearchParams(window.location.search);
+  
+  // 1. Search param override
+  const paramSub = searchParams.get('subdomain');
+  if (paramSub) return paramSub.toLowerCase().trim();
+
+  // 2. Local Storage simulated subdomain
+  const localSim = localStorage.getItem('tasky_simulated_subdomain');
+  if (localSim) return localSim.toLowerCase().trim();
+
+  // 3. Domain parsing
+  const parts = hostname.split('.');
+  if (parts.length > 2) {
+    if (hostname.includes('run.app') || hostname.includes('web.app') || hostname.includes('firebaseapp.com')) {
+      return null;
+    }
+    const sub = parts[0].toLowerCase().trim();
+    if (sub !== 'www' && sub !== 'app' && sub !== 'api' && sub !== 'localhost') {
+      return sub;
+    }
+  }
+  return null;
+};
+
 const AppContent: React.FC = () => {
   const { 
     activeTab, 
@@ -80,6 +107,25 @@ const AppContent: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isGuest = localStorage.getItem('tasky_guest_mode') === 'true';
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get('action');
+    if (action) {
+      if (action === 'quick-task') {
+        setIsQuickTaskOpen(true);
+      } else if (action === 'view-calendar') {
+        setActiveTab('calendar');
+      } else if (action === 'view-habits') {
+        setActiveTab('habits');
+      } else if (action === 'view-chat') {
+        setActiveTab('chat');
+      }
+      // Clean up the URL search param so it doesn't trigger again on reload
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, [setIsQuickTaskOpen, setActiveTab]);
+
   const userOrg = currentUserProfile?.orgId && (userOrganizations || [])
     ? userOrganizations.find((o: any) => o.id === currentUserProfile.orgId)
     : null;
@@ -96,6 +142,22 @@ const AppContent: React.FC = () => {
           <span className="text-xs font-bold text-neutral-500 dark:text-neutral-400 font-sans tracking-wider uppercase">Loading Workspace</span>
         </div>
       </div>
+    );
+  }
+
+  const subdomain = getCompanySubdomain();
+
+  if (!user && !isGuest && subdomain) {
+    return (
+      <CompanyBrandedPortal 
+        subdomain={subdomain} 
+        onClearSubdomain={() => {
+          localStorage.removeItem('tasky_simulated_subdomain');
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, newUrl);
+          window.location.reload();
+        }} 
+      />
     );
   }
 
