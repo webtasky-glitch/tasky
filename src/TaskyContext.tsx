@@ -122,7 +122,7 @@ interface TaskyContextType {
   isAdminOrManager: boolean;
 
   // Organizations Actions
-  addOrganization: (name: string, type: 'Company' | 'Family' | 'Single') => Promise<void>;
+  addOrganization: (name: string, type: 'Company' | 'Family' | 'Single', subdomain?: string) => Promise<void>;
   updateOrganization: (org: Organization) => Promise<void>;
   deleteOrganization: (id: string) => Promise<void>;
   joinOrganizationByCode: (code: string) => Promise<{ success: boolean; message: string; org?: Organization }>;
@@ -1479,7 +1479,7 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Organizations Actions
-  const addOrganization = async (name: string, type: 'Company' | 'Family' | 'Single') => {
+  const addOrganization = async (name: string, type: 'Company' | 'Family' | 'Single', subdomain?: string) => {
     const creatorEmail = user?.email?.toLowerCase().trim() || currentUserProfile?.email?.toLowerCase().trim() || 'guest@tasky.local';
     const creatorName = currentUserProfile?.name || user?.displayName || creatorEmail.split('@')[0] || 'Manager';
 
@@ -1489,7 +1489,8 @@ export const TaskyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       type,
       code: generateOrgCode(),
       createdBy: creatorEmail,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      subdomain: subdomain ? subdomain.trim().toLowerCase().replace(/[^a-z0-9-]/g, '') : name.toLowerCase().replace(/[^a-z0-9-]/g, '')
     };
 
     const newMemberId = `tm-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
