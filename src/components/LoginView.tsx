@@ -488,28 +488,8 @@ export const LoginView: React.FC = () => {
           <span>{language === 'el' ? 'Αρχική Σελίδα' : 'Back to Home'}</span>
         </button>
 
-        {/* Right side controls (Dropdown + Language Selector) */}
+        {/* Right side controls (Language Selector) */}
         <div className="pointer-events-auto flex items-center gap-2">
-          {/* SaaS Subdomain Simulator Dropdown */}
-          {organizations && organizations.filter((o: any) => o.subdomain).length > 0 && (
-            <select
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val) {
-                  localStorage.setItem('tasky_simulated_subdomain', val);
-                  window.location.reload();
-                }
-              }}
-              defaultValue=""
-              className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#12131f] border border-white/50 dark:border-white/5 shadow-md text-xs font-bold text-indigo-600 dark:text-indigo-400 focus:outline-none cursor-pointer [&>option]:bg-white dark:[&>option]:bg-neutral-900"
-            >
-              <option value="" disabled>{language === 'el' ? '🌐 Προσομοίωση' : '🌐 Simulate Subdomain'}</option>
-              {organizations.filter((o: any) => o.subdomain).map((o: any) => (
-                <option key={o.id} value={o.subdomain}>{o.name}</option>
-              ))}
-            </select>
-          )}
-
           {/* Floating Language Selection */}
           <div className="flex gap-1 p-1 rounded-xl bg-white/40 dark:bg-black/20 border border-white/50 dark:border-white/5 shadow-md">
           <button
